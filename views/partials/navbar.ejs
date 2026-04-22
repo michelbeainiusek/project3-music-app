@@ -1,0 +1,29 @@
+<nav class="navbar">
+  <a class="navbar-brand" href="/dashboard">&#9835; MusicApp</a>
+  <button class="navbar-toggle" id="navToggle" aria-label="Toggle navigation">&#9776;</button>
+  <ul class="navbar-links" id="navLinks">
+    <% if (currentUser) { %>
+      <li><a href="/artists">Artists</a></li>
+      <li><a href="/songs">Songs</a></li>
+      <li><a href="/playlists">Playlists</a></li>
+      <li class="navbar-user">
+        <span class="user-badge"><%= currentUser.username %> &bull; <span class="role-badge role-<%= currentUser.role %>"><%= currentUser.role %></span></span>
+        <form action="/auth/logout" method="POST" style="display:inline">
+          <button type="submit" class="btn btn-sm btn-outline">Logout</button>
+        </form>
+      </li>
+    <% } else { %>
+      <li><a href="/auth/login">Login</a></li>
+      <li><a href="/auth/register">Register</a></li>
+    <% } %>
+  </ul>
+</nav>
+
+<% if (success && success.length > 0) { %>
+  <div class="flash flash-success"><%= success[0] %></div>
+<% } %>
+<% if (error && error.length > 0) { %>
+  <div class="flash flash-error"><%= error[0] %></div>
+<% } %>
+
+<main class="main-content">

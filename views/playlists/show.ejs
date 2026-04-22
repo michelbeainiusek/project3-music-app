@@ -1,0 +1,53 @@
+<%- include('../partials/header') %>
+<%- include('../partials/navbar') %>
+
+<div class="page-header">
+  <h1><%= playlist.name %></h1>
+  <div class="header-actions">
+    <a href="/playlists" class="btn btn-outline">Back</a>
+    <% if (currentUser.role === 'admin') { %>
+      <a href="/playlists/<%= playlist._id %>/edit" class="btn btn-secondary">Edit</a>
+      <a href="/playlists/<%= playlist._id %>/songs" class="btn btn-secondary">Manage Songs</a>
+      <form action="/playlists/<%= playlist._id %>?_method=DELETE" method="POST" onsubmit="return confirm('Delete this playlist?')">
+        <button type="submit" class="btn btn-danger">Delete</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<div class="detail-card">
+  <div class="detail-row"><span class="detail-label">Description</span><span><%= playlist.description || 'No description.' %></span></div>
+  <div class="detail-row"><span class="detail-label">Song count</span><span><%= playlist.songs.length %></span></div>
+  <div class="detail-row"><span class="detail-label">Created</span><span><%= playlist.createdAt.toLocaleDateString() %></span></div>
+</div>
+
+<div class="section">
+  <h2>Songs</h2>
+  <% if (playlist.songs.length === 0) { %>
+    <div class="empty-state">
+      No songs in this playlist yet.
+      <% if (currentUser.role === 'admin') { %>
+        <a href="/playlists/<%= playlist._id %>/songs">Add songs.</a>
+      <% } %>
+    </div>
+  <% } else { %>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Duration</th><th></th></tr></thead>
+        <tbody>
+          <% playlist.songs.forEach((s, i) => { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td><a href="/songs/<%= s._id %>"><%= s.title %></a></td>
+            <td><a href="/artists/<%= s.artist._id %>"><%= s.artist.name %></a></td>
+            <td><%= Math.floor(s.duration / 60) %>:<%= String(s.duration % 60).padStart(2, '0') %></td>
+            <td><a href="/songs/<%= s._id %>" class="btn btn-sm btn-outline">View</a></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

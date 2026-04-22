@@ -1,0 +1,32 @@
+<%- include('../partials/header') %>
+<%- include('../partials/navbar') %>
+
+<div class="page-header">
+  <h1>Manage Playlists for &ldquo;<%= song.title %>&rdquo;</h1>
+  <a href="/songs/<%= song._id %>" class="btn btn-outline">Back to Song</a>
+</div>
+
+<div class="form-card">
+  <p class="text-muted">Check the playlists this song should belong to, then save.</p>
+  <form action="/songs/<%= song._id %>/playlists" method="POST" class="form">
+    <% if (allPlaylists.length === 0) { %>
+      <div class="empty-state">No playlists exist yet. <a href="/playlists/new">Create one first.</a></div>
+    <% } else { %>
+      <div class="checkbox-list">
+        <% const currentIds = song.playlists.map(pl => pl._id.toString()); %>
+        <% allPlaylists.forEach(pl => { %>
+          <label class="checkbox-item">
+            <input type="checkbox" name="playlists" value="<%= pl._id %>" <%= currentIds.includes(pl._id.toString()) ? 'checked' : '' %> />
+            <span><%= pl.name %></span>
+          </label>
+        <% }) %>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Assignments</button>
+        <a href="/songs/<%= song._id %>" class="btn btn-outline">Cancel</a>
+      </div>
+    <% } %>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

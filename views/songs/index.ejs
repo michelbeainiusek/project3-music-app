@@ -1,0 +1,48 @@
+<%- include('../partials/header') %>
+<%- include('../partials/navbar') %>
+
+<div class="page-header">
+  <h1>Songs</h1>
+  <% if (currentUser.role === 'admin') { %>
+    <a href="/songs/new" class="btn btn-primary">+ Add Song</a>
+  <% } %>
+</div>
+
+<% if (songs.length === 0) { %>
+  <div class="empty-state">No songs yet.<% if (currentUser.role === 'admin') { %> <a href="/songs/new">Add the first one.</a><% } %></div>
+<% } else { %>
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Artist</th>
+          <th>Duration</th>
+          <th>Year</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% songs.forEach(song => { %>
+        <tr>
+          <td><a href="/songs/<%= song._id %>"><%= song.title %></a></td>
+          <td><a href="/artists/<%= song.artist._id %>"><%= song.artist.name %></a></td>
+          <td><%= Math.floor(song.duration / 60) %>:<%= String(song.duration % 60).padStart(2, '0') %></td>
+          <td><%= song.releaseYear %></td>
+          <td class="actions">
+            <a href="/songs/<%= song._id %>" class="btn btn-sm btn-outline">View</a>
+            <% if (currentUser.role === 'admin') { %>
+              <a href="/songs/<%= song._id %>/edit" class="btn btn-sm btn-secondary">Edit</a>
+              <form action="/songs/<%= song._id %>?_method=DELETE" method="POST" onsubmit="return confirm('Delete this song?')">
+                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('../partials/footer') %>

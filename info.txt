@@ -1,0 +1,17 @@
+CSC456 – Advanced Web Programming
+Project 3 – Full-Stack MVC Music App
+
+=== TEAM MEMBERS ===
+Name: [Your Full Name]          ID: [Your Student ID]
+Name: [Partner Full Name]       ID: [Partner Student ID]
+
+=== REPOSITORY ===
+GitHub (public): https://github.com/<your-username>/<repo-name>
+
+=== DEPLOYMENT ===
+Live Render URL: https://<your-app-name>.onrender.com
+
+=== DATABASE ===
+MongoDB Atlas URI: mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/musicapp?retryWrites=true&w=majority
+
+--- Fill in the above fields before submitting ---

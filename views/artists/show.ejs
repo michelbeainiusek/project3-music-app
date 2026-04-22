@@ -1,0 +1,46 @@
+<%- include('../partials/header') %>
+<%- include('../partials/navbar') %>
+
+<div class="page-header">
+  <h1><%= artist.name %></h1>
+  <div class="header-actions">
+    <a href="/artists" class="btn btn-outline">Back</a>
+    <% if (currentUser.role === 'admin') { %>
+      <a href="/artists/<%= artist._id %>/edit" class="btn btn-secondary">Edit</a>
+      <form action="/artists/<%= artist._id %>?_method=DELETE" method="POST" onsubmit="return confirm('Delete this artist and all their songs?')">
+        <button type="submit" class="btn btn-danger">Delete</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<div class="detail-card">
+  <div class="detail-row"><span class="detail-label">Country</span><span><%= artist.country %></span></div>
+  <div class="detail-row"><span class="detail-label">Bio</span><span><%= artist.bio || 'No bio provided.' %></span></div>
+  <div class="detail-row"><span class="detail-label">Added</span><span><%= artist.createdAt.toLocaleDateString() %></span></div>
+</div>
+
+<div class="section">
+  <h2>Songs by <%= artist.name %></h2>
+  <% if (songs.length === 0) { %>
+    <div class="empty-state">No songs yet.</div>
+  <% } else { %>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Title</th><th>Duration</th><th>Year</th><th></th></tr></thead>
+        <tbody>
+          <% songs.forEach(s => { %>
+          <tr>
+            <td><a href="/songs/<%= s._id %>"><%= s.title %></a></td>
+            <td><%= Math.floor(s.duration / 60) %>:<%= String(s.duration % 60).padStart(2, '0') %></td>
+            <td><%= s.releaseYear %></td>
+            <td><a href="/songs/<%= s._id %>" class="btn btn-sm btn-outline">View</a></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

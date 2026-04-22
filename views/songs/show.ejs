@@ -1,0 +1,38 @@
+<%- include('../partials/header') %>
+<%- include('../partials/navbar') %>
+
+<div class="page-header">
+  <h1><%= song.title %></h1>
+  <div class="header-actions">
+    <a href="/songs" class="btn btn-outline">Back</a>
+    <% if (currentUser.role === 'admin') { %>
+      <a href="/songs/<%= song._id %>/edit" class="btn btn-secondary">Edit</a>
+      <a href="/songs/<%= song._id %>/playlists" class="btn btn-secondary">Manage Playlists</a>
+      <form action="/songs/<%= song._id %>?_method=DELETE" method="POST" onsubmit="return confirm('Delete this song?')">
+        <button type="submit" class="btn btn-danger">Delete</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<div class="detail-card">
+  <div class="detail-row"><span class="detail-label">Artist</span><span><a href="/artists/<%= song.artist._id %>"><%= song.artist.name %></a></span></div>
+  <div class="detail-row"><span class="detail-label">Duration</span><span><%= Math.floor(song.duration / 60) %>:<%= String(song.duration % 60).padStart(2, '0') %> (<%= song.duration %>s)</span></div>
+  <div class="detail-row"><span class="detail-label">Release Year</span><span><%= song.releaseYear %></span></div>
+  <div class="detail-row"><span class="detail-label">Added</span><span><%= song.createdAt.toLocaleDateString() %></span></div>
+</div>
+
+<div class="section">
+  <h2>In Playlists</h2>
+  <% if (song.playlists.length === 0) { %>
+    <div class="empty-state">Not in any playlist yet.</div>
+  <% } else { %>
+    <div class="tag-list">
+      <% song.playlists.forEach(pl => { %>
+        <a href="/playlists/<%= pl._id %>" class="tag"><%= pl.name %></a>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>
