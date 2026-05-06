@@ -1,14 +1,14 @@
- name: Auto Deploy to Render
+name: Auto Deploy to Render
 
-   on:
-     push:
-       branches:
-         - main
+on:
+  push:
+    branches:
+      - main
 
-   jobs:
-     deploy:
-       runs-on: ubuntu-latest
-       steps:
-         - name: Trigger Render Deploy Hook
-           run: |
-             curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render Deploy Hook
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
