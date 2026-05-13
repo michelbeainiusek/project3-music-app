@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
 
-const COOKIE_OPTIONS = {
+const COOKIE_OPTIONS = { //set browser option
   httpOnly: true, // js in browser cannot read this cookie
   maxAge: 7 * 24 * 60 * 60 * 1000, // cookie expiry in milliseconds 7x24...
 };
