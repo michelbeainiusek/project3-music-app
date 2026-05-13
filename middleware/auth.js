@@ -2,11 +2,11 @@
 // server.js soft-decodes the JWT before every request, so by the time this
 // middleware runs req.user is either a decoded payload or null.
 const requireAuth = (req, res, next) => {
-  if (!req.user) {
-    req.flash('error', 'You must be logged in to access that page.');
-    return res.redirect('/auth/login');
+  if (!req.user) { //jwt already decoded check if tempered or expired 
+    req.flash('error', 'You must be logged in to access that page.'); //redirect to login page with error message
+    return res.redirect('/auth/login'); //return to redirect to login page breaking loop
   }
-  next();
+  next(); //if user is authenticated pass control to the next middleware or controller
 };
 
 module.exports = requireAuth;

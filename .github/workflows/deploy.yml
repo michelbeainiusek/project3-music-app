@@ -5,10 +5,28 @@ on:
     branches:
       - main
 
-jobs:
+
+      # TRIGGER: this workflow runs ONLY when code is pushed to the 'main' branch.
+# Pushes to other branches (feature branches) do NOT trigger a deploy.
+# Pull request merges into main DO trigger it.
+
+jobs: # can be named anything
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest 
+    # GitHub provides a fresh Ubuntu virtual machine to run this job.
+    # The VM is thrown away after the job completes.
     steps:
       - name: Trigger Render Deploy Hook
         run: |
           curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+ # curl = command-line HTTP client (built into Ubuntu)
+          # -X POST = send an HTTP POST request
+          # The URL is the Render deploy hook (stored as a GitHub secret)
+          # When Render receives this POST, it immediately starts a new deployment:
+          #   1. Pulls the latest commit from GitHub
+          #   2. Runs 'npm install'
+          #   3. Runs 'node server.js'
+          #   4. Replaces the old instance with the new one
+          # ${{ secrets.RENDER_DEPLOY_HOOK_URL }} = reads the GitHub Actions secret.
+          # Secrets are encrypted in GitHub and never appear in logs.

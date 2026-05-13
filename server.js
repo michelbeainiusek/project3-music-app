@@ -1,59 +1,65 @@
-require('dotenv').config();
-const express = require('express');
-const path = require('path');
-const cookieParser = require('cookie-parser');
-const methodOverride = require('method-override');
-const session = require('express-session');
-const flash = require('connect-flash');
-const jwt = require('jsonwebtoken');
+// middlewear run for every request
+require('dotenv').config();// load env variables fromenv into proce.env
+const express = require('express');// get espress
+const path = require('path');//built in path module
+const cookieParser = require('cookie-parser');// read cookies from incoming request
+const methodOverride = require('method-override');//ets forms send PUT/DELETE requests (HTML forms only support GET/POST)
+const flash = require('connect-flash'); // one-time notification messages ("Artist created!")
+const jwt = require('jsonwebtoken');// used in the soft-decode middleware below
 
-const connectDB = require('./config/db');
+// import riyte and conenct db 
+const connectDB = require('./config/db');// connect to database
 const authRoutes = require('./routes/auth.routes');
 const artistRoutes = require('./routes/artist.routes');
 const songRoutes = require('./routes/song.routes');
 const playlistRoutes = require('./routes/playlist.routes');
 const dashboardController = require('./controllers/dashboard.controller');
-const requireAuth = require('./middleware/auth');
 
-const app = express();
+const requireAuth = require('./middleware/auth'); //middleware to check if user is authenticated- if yes next middlewear-else go to login
 
-connectDB();
+const app = express(); // create express app
+
+connectDB(); // connect to database
 
 // View engine
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'ejs'); //  tells Express to use EJS for rendering HTML templates
+app.set('views', path.join(__dirname, 'views'));//tells Express where to find those templates (project3/views/)
+
 
 // Body parsing, cookies, method override, static files
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-app.use(cookieParser());
-app.use(methodOverride('_method'));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.urlencoded({ extended: true })); //parse form fields from req.body- if send form and make data avaible
+app.use(express.json()); //parse JSON request bodies
+app.use(cookieParser()); // make cookie readble
+app.use(methodOverride('_method')); // forms can do get or psot not delte, read and make it work like it delete
+app.use(express.static(path.join(__dirname, 'public'))); //serve static files directly (CSS, JS)
 
-// Session needed by connect-flash
-app.use(session({
+// Session needed by connect-flash- flash need somewhere to live- req.flash('success', 'Artist created!')
+app.use(session({ //Sets up a temporary memory space for this user's session — needed so flash messages (step 6) have somewhere to live.
   secret: process.env.SESSION_SECRET || 'changeme',
-  resave: false,
-  saveUninitialized: false,
+  resave: false, //don't re-save session if nothing changed
+  saveUninitialized: false,//  — don't create a session until data is actually stored
   cookie: { secure: process.env.NODE_ENV === 'production' },
 }));
-app.use(flash());
+app.use(flash()); //Flash messages are one-time notifications like "Artist created successfully!" — they show once then disappear. This step makes those available.
 
-// Soft JWT decode on every request — sets req.user and res.locals.currentUser
-// Does not block; protected routes use requireAuth middleware
+
+
+//On every request, it checks "who is this person?" by reading their JWT cookie and verifying it's real. 
+// Then makes that info available to the whole app.
+// without this decode jwt at every controller
 app.use((req, res, next) => {
-  const token = req.cookies.token;
-  if (token) {
+  const token = req.cookies.token; // read jwt cookie
+  if (token) { // if token is there try to verify it or if has been tempered with
     try {
-      req.user = jwt.verify(token, process.env.JWT_SECRET || 'fallback');
-    } catch {
-      req.user = null;
+      req.user = jwt.verify(token, process.env.JWT_SECRET || 'fallback');// verify and se if expired or not
+    } catch { // if token is not valid set req.user to null- treat as logged out
+      req.user = null; // redirect to login apge thanks to requireauth
     }
   } else {
     req.user = null;
   }
-  res.locals.currentUser = req.user;
-  res.locals.success = req.flash('success');
+  res.locals.currentUser = req.user; // "who is browsing right now" — set once in server.js, available everywhere automatically
+  res.locals.success = req.flash('success');//reads flash messages (this also clears them, so they only show once)
   res.locals.error = req.flash('error');
   next();
 });

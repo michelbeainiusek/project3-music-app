@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Project 3 — Full-Stack MVC Music App — Deep Dive</title>
+<style>
+  :root {
+    --bg:        #0f1117;
+    --surface:   #1a1d27;
+    --border:    #2a2d3a;
+    --text:      #cdd6f4;
+    --muted:     #7f849c;
+    --accent:    #89b4fa;
+    --red:       #f38ba8;
+    --green:     #a6e3a1;
+    --yellow:    #f9e2af;
+    --orange:    #fab387;
+    --blue:      #89dceb;
+    --purple:    #cba6f7;
+    --sidebar-w: 270px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.75;
+    display: flex;
+  }
+  body.sidebar-open { overflow: hidden; }
+
+  #toc-toggle {
+    position: fixed; top: 12px; left: 12px; z-index: 220;
+    display: none; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text);
+    border-radius: 8px; padding: 8px 10px; font-size: 13px; cursor: pointer;
+  }
+  #toc-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  #sidebar-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 160; display: none;
+  }
+
+  nav#sidebar {
+    width: var(--sidebar-w); min-height: 100vh; background: var(--surface);
+    border-right: 1px solid var(--border); position: fixed; top: 0; left: 0;
+    overflow-y: auto; padding: 20px 0 40px; z-index: 100; transition: transform .22s ease;
+  }
+  nav#sidebar .brand { padding: 0 18px 16px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+  nav#sidebar .brand h1 { font-size: 13px; color: var(--accent); font-weight: 700; letter-spacing:.05em; text-transform:uppercase; }
+  nav#sidebar .brand p  { font-size: 11px; color: var(--muted); margin-top:2px; }
+  nav#sidebar .group-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); padding: 14px 18px 4px;
+  }
+  nav#sidebar a {
+    display: block; padding: 5px 18px 5px 22px; font-size: 12.5px; color: var(--text);
+    text-decoration: none; border-left: 2px solid transparent; transition: all .15s;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  nav#sidebar a:hover { color: var(--accent); border-left-color: var(--accent); background: rgba(137,180,250,.06); }
+  nav#sidebar a.layer-server:hover     { border-left-color: var(--red);    color: var(--red); }
+  nav#sidebar a.layer-model:hover      { border-left-color: var(--blue);   color: var(--blue); }
+  nav#sidebar a.layer-route:hover      { border-left-color: var(--green);  color: var(--green); }
+  nav#sidebar a.layer-ctrl:hover       { border-left-color: var(--orange); color: var(--orange); }
+  nav#sidebar a.layer-view:hover       { border-left-color: var(--purple); color: var(--purple); }
+  nav#sidebar a.layer-middleware:hover { border-left-color: var(--yellow); color: var(--yellow); }
+
+  main { margin-left: var(--sidebar-w); padding: 48px 56px 100px; max-width: 980px; width: 100%; }
+
+  section { margin-bottom: 90px; }
+  section:not(:last-child) { border-bottom: 1px solid var(--border); padding-bottom: 70px; }
+
+  .section-tag {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    letter-spacing: .12em; text-transform: uppercase; padding: 2px 8px;
+    border-radius: 4px; margin-bottom: 8px;
+  }
+  .tag-overview   { background: rgba(137,180,250,.15); color: var(--accent); }
+  .tag-server     { background: rgba(243,139,168,.15); color: var(--red); }
+  .tag-model      { background: rgba(137,220,235,.15); color: var(--blue); }
+  .tag-route      { background: rgba(166,227,161,.15); color: var(--green); }
+  .tag-ctrl       { background: rgba(250,179,135,.15); color: var(--orange); }
+  .tag-view       { background: rgba(203,166,247,.15); color: var(--purple); }
+  .tag-middleware { background: rgba(249,226,175,.15); color: var(--yellow); }
+  .tag-deploy     { background: rgba(243,139,168,.15); color: var(--red); }
+
+  h2.section-title { font-size: 26px; font-weight: 700; margin-bottom: 6px; line-height: 1.2; }
+  .section-path { font-size: 12px; color: var(--muted); font-family: 'Cascadia Code','Consolas',monospace; margin-bottom: 20px; }
+
+  h3 { font-size: 17px; font-weight: 600; color: var(--accent); margin: 36px 0 10px; }
+  h4 { font-size: 13px; font-weight: 600; color: var(--yellow); margin: 20px 0 6px; }
+  p  { margin-bottom: 14px; }
+  ul, ol { margin: 0 0 14px 22px; }
+  li { margin-bottom: 5px; }
+
+  pre {
+    background: #11131c; border: 1px solid var(--border); border-radius: 8px;
+    padding: 18px 20px; overflow-x: auto;
+    font-family: 'Cascadia Code','Consolas','Courier New',monospace;
+    font-size: 13px; line-height: 1.65; margin: 12px 0 8px;
+  }
+  code { font-family: inherit; }
+  pre .kw  { color: #cba6f7; }
+  pre .str { color: #a6e3a1; }
+  pre .cmt { color: #585b70; font-style: italic; }
+  pre .fn  { color: #89b4fa; }
+  pre .num { color: #fab387; }
+  pre .obj { color: #f9e2af; }
+  pre .op  { color: #89dceb; }
+
+  :not(pre) > code {
+    background: rgba(137,180,250,.1); color: var(--accent); padding: 1px 6px;
+    border-radius: 4px; font-size: 12.5px; font-family: 'Cascadia Code','Consolas',monospace;
+  }
+
+  .code-caption { font-size: 11px; color: var(--muted); margin-bottom: 16px; font-family: 'Cascadia Code',monospace; }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 22px; font-size: 13px; }
+  th { background: var(--surface); color: var(--muted); font-weight: 600; text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+
+  .callout {
+    border-left: 3px solid var(--accent); background: rgba(137,180,250,.06);
+    padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 16px 0; font-size: 13.5px;
+  }
+  .callout.warn   { border-left-color: var(--yellow); background: rgba(249,226,175,.06); }
+  .callout.danger { border-left-color: var(--red);    background: rgba(243,139,168,.06); }
+  .callout.ok     { border-left-color: var(--green);  background: rgba(166,227,161,.06); }
+
+  .flow {
+    background: #11131c; border: 1px solid var(--border); border-radius: 8px;
+    padding: 18px 24px; font-family: 'Cascadia Code','Consolas',monospace;
+    font-size: 12.5px; color: var(--muted); line-height: 2; margin: 12px 0 20px;
+    white-space: pre; overflow-x: auto;
+  }
+  .flow .hl { color: var(--accent); font-weight: 700; }
+  .flow .hi { color: var(--green); }
+  .flow .hr { color: var(--red); }
+  .flow .ho { color: var(--orange); }
+  .flow .hp { color: var(--purple); }
+  .flow .hy { color: var(--yellow); }
+
+  .annotation {
+    display: flex; gap: 12px; margin: 6px 0 4px; font-size: 12.5px;
+    border-left: 2px solid var(--border); padding-left: 12px;
+  }
+  .annotation .line-num {
+    color: var(--muted); font-family: 'Cascadia Code',monospace;
+    min-width: 40px; flex-shrink: 0; padding-top: 1px;
+  }
+  .annotation .line-exp { color: var(--text); }
+
+  .anno-block { margin: 16px 0 24px; }
+
+  @media (max-width: 1100px) {
+    #toc-toggle { display: inline-flex; align-items: center; gap: 6px; }
+    nav#sidebar { transform: translateX(-100%); width: min(320px,86vw); min-height: 100vh; }
+    body.sidebar-open nav#sidebar { transform: translateX(0); z-index: 200; }
+    body.sidebar-open #sidebar-backdrop { display: block; }
+    main { margin-left: 0; padding: 58px 20px 60px; max-width: none; }
+  }
+  @media (max-width: 768px) { main { padding: 58px 16px 56px; } }
+</style>
+</head>
+<body>
+
+<button id="toc-toggle">☰ Contents</button>
+<div id="sidebar-backdrop"></div>
+
+<nav id="sidebar">
+  <div class="brand">
+    <h1>Project 3 — Deep Dive</h1>
+    <p>Full-Stack MVC Music App</p>
+  </div>
+
+  <div class="group-label">Overview</div>
+  <a href="#overview">Stack &amp; Domain</a>
+  <a href="#request-lifecycle">Full Request Lifecycle</a>
+  <a href="#relationships">Data Relationships</a>
+  <a href="#auth-strategy">Auth Strategy</a>
+
+  <div class="group-label">Server &amp; Config</div>
+  <a href="#server" class="layer-server">server.js — line by line</a>
+  <a href="#db" class="layer-server">config/db.js</a>
+
+  <div class="group-label">Models</div>
+  <a href="#model-user" class="layer-model">User Model</a>
+  <a href="#model-artist" class="layer-model">Artist Model</a>
+  <a href="#model-song" class="layer-model">Song Model</a>
+  <a href="#model-playlist" class="layer-model">Playlist Model</a>
+
+  <div class="group-label">Middleware</div>
+  <a href="#mw-auth" class="layer-middleware">requireAuth</a>
+  <a href="#mw-role" class="layer-middleware">requireRole</a>
+
+  <div class="group-label">Controllers</div>
+  <a href="#ctrl-auth" class="layer-ctrl">auth.controller</a>
+  <a href="#ctrl-dashboard" class="layer-ctrl">dashboard.controller</a>
+  <a href="#ctrl-artist" class="layer-ctrl">artist.controller</a>
+  <a href="#ctrl-song" class="layer-ctrl">song.controller</a>
+  <a href="#ctrl-playlist" class="layer-ctrl">playlist.controller</a>
+
+  <div class="group-label">Routes</div>
+  <a href="#routes-auth" class="layer-route">auth.routes</a>
+  <a href="#routes-artist" class="layer-route">artist.routes</a>
+  <a href="#routes-song" class="layer-route">song.routes</a>
+  <a href="#routes-playlist" class="layer-route">playlist.routes</a>
+
+  <div class="group-label">Views</div>
+  <a href="#views-ejs-syntax" class="layer-view">EJS Syntax Explained</a>
+  <a href="#views-partials" class="layer-view">Partials</a>
+  <a href="#views-auth" class="layer-view">Auth Views</a>
+  <a href="#views-dashboard" class="layer-view">Dashboard</a>
+  <a href="#views-crud" class="layer-view">CRUD Views</a>
+  <a href="#views-rel" class="layer-view">Relationship Views</a>
+
+  <div class="group-label">Deployment</div>
+  <a href="#deploy-env">Environment Variables</a>
+  <a href="#deploy-atlas">MongoDB Atlas</a>
+  <a href="#deploy-render">Render</a>
+  <a href="#deploy-cicd">CI/CD — line by line</a>
+</nav>
+
+<main>
+
+<!-- ════════════════════════════════════════════════════════════════════ OVERVIEW -->
+<section id="overview">
+  <span class="section-tag tag-overview">Overview</span>
+  <h2 class="section-title">Stack &amp; Domain</h2>
+
+  <p>A full-stack web application that lets authenticated users browse and manage a music catalog. Admins can create, edit, and delete records; regular users get read-only access. Everything is server-side rendered — there is no separate frontend framework.</p>
+
+  <h3>Technology Stack</h3>
+  <table>
+    <thead><tr><th>Concern</th><th>Technology</th><th>Why this choice</th></tr></thead>
+    <tbody>
+      <tr><td>Runtime</td><td>Node.js 18+</td><td>Async I/O, large npm ecosystem</td></tr>
+      <tr><td>HTTP Framework</td><td>Express 4</td><td>Minimal, unopinionated, vast middleware ecosystem</td></tr>
+      <tr><td>Database</td><td>MongoDB Atlas</td><td>Document-oriented, flexible schema, free cloud tier</td></tr>
+      <tr><td>ODM</td><td>Mongoose 8</td><td>Schema validation, relationship population, clean query API</td></tr>
+      <tr><td>Templating</td><td>EJS</td><td>Pure HTML with embedded JS — easy to read, no build step</td></tr>
+      <tr><td>Authentication</td><td>JWT + bcrypt</td><td>Stateless tokens, industry-standard password hashing</td></tr>
+      <tr><td>Session Flash</td><td>connect-flash</td><td>One-time success/error messages without a full session store</td></tr>
+      <tr><td>Form PUT/DELETE</td><td>method-override</td><td>HTML forms only support GET/POST — this patch adds PUT/DELETE</td></tr>
+      <tr><td>Deployment</td><td>Render + GitHub Actions</td><td>Free tier, easy GitHub integration, auto-redeploy on push</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Music Domain — Entity Map</h3>
+  <div class="flow"><span class="hl">Artist</span>  ──(one)──▶──(many)──  <span class="hi">Song</span>
+                              ↕  (many-to-many)
+                         <span class="hp">Playlist</span>
+
+<span class="hl">Artist</span>: { name, country, bio }
+<span class="hi">Song</span>:   { title, duration (seconds), releaseYear, artist→ref, playlists→[ref] }
+<span class="hp">Playlist</span>: { name, description, songs→[ref] }
+<span class="hy">User</span>:   { username, email, passwordHash, role: 'admin'|'user' }</div>
+
+  <div class="callout ok">
+    <strong>Live App:</strong> <a href="https://project3-music-app.onrender.com" target="_blank">project3-music-app.onrender.com</a> &nbsp;|&nbsp;
+    <strong>GitHub:</strong> <a href="https://github.com/michelbeainiusek/project3-music-app" target="_blank">michelbeainiusek/project3-music-app</a>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ REQUEST LIFECYCLE -->
+<section id="request-lifecycle">
+  <span class="section-tag tag-overview">Overview</span>
+  <h2 class="section-title">Full Request Lifecycle</h2>
+
+  <p>Every HTTP request passes through the same pipeline. Understanding this pipeline is key to understanding the whole app.</p>
+
+  <div class="flow">Browser sends:  <span class="hl">GET /songs</span>  (with Cookie: token=eyJ...)
+         │
+         ▼
+<span class="hr">server.js</span> — global middleware stack runs top to bottom:
+  1. express.urlencoded  → parse form fields from req.body
+  2. cookieParser        → parse Cookie header → req.cookies.token
+  3. methodOverride      → check ?_method=PUT/DELETE and rewrite method
+  4. express.static      → serve /public files directly (CSS, JS)
+  5. express-session     → set up req.session (needed by connect-flash)
+  6. connect-flash       → attach req.flash() read/write helpers
+  7. <span class="hy">Soft JWT decode</span>    → read req.cookies.token
+                          → jwt.verify() → set req.user + res.locals.currentUser
+                          → read flash → set res.locals.success / res.locals.error
+         │
+         ▼
+<span class="hi">Routes</span> — server.js routes the request to the correct router:
+  app.use('/songs', songRoutes) → matched!
+         │
+         ▼
+<span class="hi">song.routes.js</span> — matches: GET / → [requireAuth, ctrl.index]
+         │
+         ▼
+<span class="hy">requireAuth</span> middleware:
+  req.user exists? → YES → next()
+  req.user is null? → redirect to /auth/login
+         │
+         ▼
+<span class="ho">song.controller.index</span>:
+  await Song.find().populate('artist').sort({ title: 1 })
+  res.render('songs/index', { title: 'Songs', songs })
+         │
+         ▼
+<span class="hp">EJS template engine</span>:
+  loads views/songs/index.ejs
+  includes partials (header, navbar, footer)
+  fills in &lt;%= songs %&gt; placeholders with real data
+  produces final HTML string
+         │
+         ▼
+Browser receives: <span class="hi">200 OK</span> + complete HTML page</div>
+
+  <h3>What <code>res.locals</code> Does</h3>
+  <p><code>res.locals</code> is an object that Express automatically makes available inside every EJS template rendered during that request. By setting <code>res.locals.currentUser</code> in the global middleware, every view — from login page to dashboard — can access <code>currentUser</code> without each controller needing to pass it explicitly.</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ RELATIONSHIPS -->
+<section id="relationships">
+  <span class="section-tag tag-overview">Overview</span>
+  <h2 class="section-title">Data Relationships — How They Work</h2>
+
+  <h3>One-to-Many: Artist → Songs</h3>
+  <p>Each Song document stores the <code>_id</code> of one Artist in its <code>artist</code> field. The Artist document stores nothing — it has no <code>songs</code> array. To find all songs by an artist you query Song by <code>artist</code> field.</p>
+
+  <pre><code><span class="cmt">// How the relationship is stored in MongoDB:</span>
+<span class="cmt">// Artist document in 'artists' collection:</span>
+{ _id: <span class="str">"a1"</span>, name: <span class="str">"Adele"</span>, country: <span class="str">"UK"</span> }
+
+<span class="cmt">// Song document in 'songs' collection — stores artist's _id:</span>
+{ _id: <span class="str">"s1"</span>, title: <span class="str">"Hello"</span>, artist: <span class="str">"a1"</span>, ... }
+{ _id: <span class="str">"s2"</span>, title: <span class="str">"Rolling"</span>, artist: <span class="str">"a1"</span>, ... }
+
+<span class="cmt">// To get all songs for an artist (in the controller):</span>
+<span class="kw">const</span> songs = <span class="kw">await</span> Song.<span class="fn">find</span>({ artist: artist._id });
+
+<span class="cmt">// To get the full artist object on a song (populate):</span>
+<span class="kw">const</span> song = <span class="kw">await</span> Song.<span class="fn">findById</span>(id).<span class="fn">populate</span>(<span class="str">'artist'</span>);
+<span class="cmt">// song.artist is now the full Artist document, not just the _id</span></code></pre>
+
+  <h3>Many-to-Many: Songs ↔ Playlists</h3>
+  <p>Both sides store arrays of ObjectId references. This is called a <strong>bidirectional reference</strong>. MongoDB doesn't enforce this automatically — the controllers are responsible for keeping both sides in sync.</p>
+
+  <pre><code><span class="cmt">// Song document stores which playlists it belongs to:</span>
+{ _id: <span class="str">"s1"</span>, title: <span class="str">"Hello"</span>, playlists: [<span class="str">"p1"</span>, <span class="str">"p2"</span>] }
+
+<span class="cmt">// Playlist document stores which songs it contains:</span>
+{ _id: <span class="str">"p1"</span>, name: <span class="str">"Chill"</span>, songs: [<span class="str">"s1"</span>, <span class="str">"s3"</span>] }
+{ _id: <span class="str">"p2"</span>, name: <span class="str">"Workout"</span>, songs: [<span class="str">"s1"</span>] }</code></pre>
+
+  <h3>Sync Algorithm (used in both controllers)</h3>
+  <p>When a user changes the playlist assignments for a song, the controller needs to figure out what changed and update both sides.</p>
+
+  <pre><code><span class="cmt">// Example: song "Hello" was in [p1, p2], user now selects [p2, p3]</span>
+
+<span class="kw">const</span> oldIds = [<span class="str">'p1'</span>, <span class="str">'p2'</span>];   <span class="cmt">// what it was before</span>
+<span class="kw">const</span> newIds = [<span class="str">'p2'</span>, <span class="str">'p3'</span>];   <span class="cmt">// what user submitted</span>
+
+<span class="cmt">// removed = in old but NOT in new → must $pull song from these playlists</span>
+<span class="kw">const</span> removed = oldIds.<span class="fn">filter</span>(id <span class="op">=></span> !newIds.<span class="fn">includes</span>(id));   <span class="cmt">// ['p1']</span>
+
+<span class="cmt">// added = in new but NOT in old → must $addToSet song to these playlists</span>
+<span class="kw">const</span> added = newIds.<span class="fn">filter</span>(id <span class="op">=></span> !oldIds.<span class="fn">includes</span>(id));     <span class="cmt">// ['p3']</span>
+
+<span class="cmt">// $pull: remove this song's _id from playlists it left</span>
+<span class="kw">await</span> Playlist.<span class="fn">updateMany</span>(
+  { _id: { $in: removed } },
+  { $pull: { songs: song._id } }
+);
+
+<span class="cmt">// $addToSet: add this song's _id to new playlists (prevents duplicates)</span>
+<span class="kw">await</span> Playlist.<span class="fn">updateMany</span>(
+  { _id: { $in: added } },
+  { $addToSet: { songs: song._id } }
+);
+
+<span class="cmt">// Finally update the song's own playlists array</span>
+song.playlists = newIds;
+<span class="kw">await</span> song.<span class="fn">save</span>();</code></pre>
+
+  <div class="callout">
+    <strong>Why <code>$addToSet</code> instead of <code>$push</code>?</strong> <code>$addToSet</code> only adds the value if it doesn't already exist in the array. <code>$push</code> would add duplicates. This prevents data corruption if the endpoint is called twice.
+  </div>
+
+  <h3>Cascade Delete (Artist)</h3>
+  <p>When an artist is deleted, all their songs must be deleted too, AND any playlist that contained those songs must have those song references removed. This takes 3 queries:</p>
+
+  <pre><code><span class="cmt">// Step 1: get all song IDs belonging to this artist</span>
+<span class="kw">const</span> songs = <span class="kw">await</span> Song.<span class="fn">find</span>({ artist: req.params.id }, <span class="str">'_id'</span>);
+<span class="cmt">// Second argument '_id' means: only return the _id field, skip the rest (projection)</span>
+<span class="kw">const</span> songIds = songs.<span class="fn">map</span>(s <span class="op">=></span> s._id);   <span class="cmt">// ['s1', 's2']</span>
+
+<span class="cmt">// Step 2: remove those song IDs from every playlist that references them</span>
+<span class="kw">if</span> (songIds.length) {
+  <span class="kw">await</span> Playlist.<span class="fn">updateMany</span>(
+    { songs: { $in: songIds } },     <span class="cmt">// find all playlists that have ANY of these song IDs</span>
+    { $pull: { songs: { $in: songIds } } }  <span class="cmt">// remove all those IDs from the songs array</span>
+  );
+}
+
+<span class="cmt">// Step 3: delete songs, then artist</span>
+<span class="kw">await</span> Song.<span class="fn">deleteMany</span>({ artist: req.params.id });
+<span class="kw">await</span> Artist.<span class="fn">findByIdAndDelete</span>(req.params.id);</code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ AUTH STRATEGY -->
+<section id="auth-strategy">
+  <span class="section-tag tag-overview">Overview</span>
+  <h2 class="section-title">Authentication &amp; Authorization Strategy</h2>
+
+  <h3>Why JWT in a Cookie?</h3>
+  <p>Traditional sessions store user state on the server (in memory or a database). JWT (JSON Web Tokens) are <strong>stateless</strong> — all the user's info (<code>id</code>, <code>username</code>, <code>role</code>) is encoded into the token itself, signed with a secret key, and stored <em>client-side</em> in a cookie.</p>
+
+  <table>
+    <thead><tr><th>Approach</th><th>Pros</th><th>Cons</th></tr></thead>
+    <tbody>
+      <tr><td>Server sessions</td><td>Easy to invalidate</td><td>Requires session store (memory/Redis/DB)</td></tr>
+      <tr><td>JWT in localStorage</td><td>Simple to use in SPAs</td><td>Vulnerable to XSS — JS can steal it</td></tr>
+      <tr><td><strong>JWT in httpOnly cookie</strong></td><td>XSS-safe (JS cannot read), works perfectly with server-side rendering</td><td>CSRF risk (mitigated by same-site cookie policy)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>What is a JWT?</h3>
+  <pre><code><span class="cmt">// A JWT has 3 parts separated by dots:</span>
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9   <span class="cmt">← Header (algorithm + type), base64 encoded</span>
+.eyJpZCI6IjY2MSIsInVzZXJuYW1lIjoibWljaGVsIiwicm9sZSI6ImFkbWluIn0  <span class="cmt">← Payload (your data), base64 encoded</span>
+.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c  <span class="cmt">← Signature (HMAC-SHA256 of header+payload using JWT_SECRET)</span>
+
+<span class="cmt">// The payload decoded contains:</span>
+{ id: <span class="str">"661..."</span>, username: <span class="str">"michel"</span>, role: <span class="str">"admin"</span>, iat: 1714000000, exp: 1714604800 }</code></pre>
+
+  <div class="callout warn">
+    <strong>Security note:</strong> The payload is only <em>base64 encoded</em>, not encrypted. Anyone can decode it. The <em>signature</em> is what proves it hasn't been tampered with — only someone with the <code>JWT_SECRET</code> can produce a valid signature.
+  </div>
+
+  <h3>bcrypt — Password Hashing</h3>
+  <pre><code><span class="cmt">// On registration — hash the password before saving to DB:</span>
+<span class="kw">const</span> passwordHash = <span class="kw">await</span> bcrypt.<span class="fn">hash</span>(password, <span class="num">12</span>);
+<span class="cmt">// 12 = salt rounds. Each round doubles the computation time.
+// 12 rounds ≈ 300ms on modern hardware — slow enough to frustrate brute-force,
+// fast enough to not annoy users.</span>
+
+<span class="cmt">// What gets stored in MongoDB:</span>
+<span class="cmt">// "$2b$12$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"</span>
+<span class="cmt">// This is a one-way hash — there is no way to recover the original password.</span>
+
+<span class="cmt">// On login — compare without revealing the hash:</span>
+<span class="kw">const</span> isMatch = <span class="kw">await</span> bcrypt.<span class="fn">compare</span>(submittedPassword, user.passwordHash);
+<span class="cmt">// Returns true/false. bcrypt internally extracts the salt from the stored hash
+// and hashes the submitted password with the same salt, then compares.</span></code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ SERVER.JS -->
+<section id="server">
+  <span class="section-tag tag-server">Server</span>
+  <h2 class="section-title">server.js — Line by Line</h2>
+  <p class="section-path">project3/server.js — Entry point of the entire application</p>
+
+  <h3>Imports (Lines 1–16)</h3>
+  <pre><code><span class="num">1</span>  <span class="fn">require</span>(<span class="str">'dotenv'</span>).<span class="fn">config</span>();
+<span class="cmt">   // Reads .env file and loads each KEY=VALUE pair into process.env
+   // Must be the FIRST line so that process.env.MONGO_URI etc. are available
+   // to all the require() calls that follow</span>
+
+<span class="num">2</span>  <span class="kw">const</span> express = <span class="fn">require</span>(<span class="str">'express'</span>);
+<span class="num">3</span>  <span class="kw">const</span> path    = <span class="fn">require</span>(<span class="str">'path'</span>);
+<span class="cmt">   // Node built-in: builds OS-safe file paths (__dirname + '/views' etc.)</span>
+
+<span class="num">4</span>  <span class="kw">const</span> cookieParser  = <span class="fn">require</span>(<span class="str">'cookie-parser'</span>);
+<span class="cmt">   // Parses the Cookie request header into req.cookies object
+   // Without this, req.cookies would be undefined and JWT reading would fail</span>
+
+<span class="num">5</span>  <span class="kw">const</span> methodOverride = <span class="fn">require</span>(<span class="str">'method-override'</span>);
+<span class="cmt">   // HTML forms can only send GET or POST. This middleware reads ?_method=PUT
+   // or ?_method=DELETE from the URL query string and rewrites req.method
+   // so Express routes it to the correct PUT/DELETE handler</span>
+
+<span class="num">6</span>  <span class="kw">const</span> session = <span class="fn">require</span>(<span class="str">'express-session'</span>);
+<span class="num">7</span>  <span class="kw">const</span> flash   = <span class="fn">require</span>(<span class="str">'connect-flash'</span>);
+<span class="cmt">   // connect-flash stores one-time messages in the session.
+   // req.flash('success', 'Done!') saves a message.
+   // req.flash('success') reads AND clears it — it only shows once.</span>
+
+<span class="num">8</span>  <span class="kw">const</span> jwt = <span class="fn">require</span>(<span class="str">'jsonwebtoken'</span>);
+<span class="cmt">   // Used in the soft-decode middleware below</span></code></pre>
+
+  <h3>App Setup (Lines 18–24)</h3>
+  <pre><code><span class="kw">const</span> app = <span class="fn">express</span>();
+<span class="cmt">// Creates the Express application. 'app' is the central object —
+// you attach middleware and routes to it.</span>
+
+<span class="fn">connectDB</span>();
+<span class="cmt">// Calls config/db.js which runs mongoose.connect(MONGO_URI).
+// This is async but we don't await it here — Mongoose queues all
+// operations and executes them once the connection opens.</span>
+
+app.<span class="fn">set</span>(<span class="str">'view engine'</span>, <span class="str">'ejs'</span>);
+<span class="cmt">// Tells Express to use EJS when res.render() is called.
+// Express will automatically append '.ejs' to template names.</span>
+
+app.<span class="fn">set</span>(<span class="str">'views'</span>, path.<span class="fn">join</span>(__dirname, <span class="str">'views'</span>));
+<span class="cmt">// Tells Express where to find EJS templates.
+// __dirname = the folder where server.js lives (project3/)
+// So templates are in project3/views/</span></code></pre>
+
+  <h3>Middleware Stack (Lines 27–40)</h3>
+  <pre><code>app.<span class="fn">use</span>(express.<span class="fn">urlencoded</span>({ extended: <span class="kw">true</span> }));
+<span class="cmt">// Parses form submissions (Content-Type: application/x-www-form-urlencoded)
+// into req.body. 'extended: true' allows nested objects in form data.</span>
+
+app.<span class="fn">use</span>(express.<span class="fn">json</span>());
+<span class="cmt">// Parses JSON request bodies. Not strictly needed for EJS forms
+// but included for completeness.</span>
+
+app.<span class="fn">use</span>(<span class="fn">cookieParser</span>());
+<span class="cmt">// Must come BEFORE the soft JWT decode below.
+// Makes req.cookies available (contains our 'token' JWT cookie).</span>
+
+app.<span class="fn">use</span>(<span class="fn">methodOverride</span>(<span class="str">'_method'</span>));
+<span class="cmt">// The string '_method' tells it to look at the query string parameter
+// named '_method'. Forms use: action="/artists/123?_method=DELETE"</span>
+
+app.<span class="fn">use</span>(express.<span class="fn">static</span>(path.<span class="fn">join</span>(__dirname, <span class="str">'public'</span>)));
+<span class="cmt">// Serves files in project3/public/ at the root URL.
+// /css/style.css in a browser → serves project3/public/css/style.css</span>
+
+app.<span class="fn">use</span>(<span class="fn">session</span>({
+  secret: process.env.SESSION_SECRET || <span class="str">'changeme'</span>,
+  <span class="cmt">// Secret used to sign the session ID cookie</span>
+  resave: <span class="kw">false</span>,
+  <span class="cmt">// Don't re-save session if nothing changed</span>
+  saveUninitialized: <span class="kw">false</span>,
+  <span class="cmt">// Don't create a session until something is stored (reduces storage)</span>
+  cookie: { secure: process.env.NODE_ENV === <span class="str">'production'</span> },
+  <span class="cmt">// secure: true means cookie only sent over HTTPS.
+  // In production (Render uses HTTPS), this is true.
+  // In local dev (HTTP), this is false — otherwise cookies wouldn't send.</span>
+}));
+app.<span class="fn">use</span>(<span class="fn">flash</span>());
+<span class="cmt">// Must come AFTER session(). Flash uses the session to store messages.</span></code></pre>
+
+  <h3>Soft JWT Decode (Lines 44–58) — Most Important Middleware</h3>
+  <pre><code>app.<span class="fn">use</span>(<span class="fn">(req, res, next)</span> <span class="op">=></span> {
+  <span class="kw">const</span> token = req.cookies.token;
+  <span class="cmt">  // Read the 'token' cookie from the request.
+  // If user is not logged in, this will be undefined.</span>
+
+  <span class="kw">if</span> (token) {
+    <span class="kw">try</span> {
+      req.user = jwt.<span class="fn">verify</span>(token, process.env.JWT_SECRET || <span class="str">'fallback'</span>);
+      <span class="cmt">      // jwt.verify() does two things:
+      // 1. Checks the signature against JWT_SECRET (has it been tampered with?)
+      // 2. Checks the expiry (has 7 days passed?)
+      // If both pass, it returns the decoded payload: { id, username, role, iat, exp }
+      // If either fails, it throws an error (caught below)</span>
+    } <span class="kw">catch</span> {
+      req.user = <span class="kw">null</span>;
+      <span class="cmt">      // Expired token, tampered token, or wrong secret → treat as logged out</span>
+    }
+  } <span class="kw">else</span> {
+    req.user = <span class="kw">null</span>;
+    <span class="cmt">    // No cookie → not logged in</span>
+  }
+
+  res.locals.currentUser = req.user;
+  <span class="cmt">  // res.locals = object Express injects into every EJS render during this request
+  // Setting currentUser here means ALL views can use &lt;%= currentUser.username %&gt;
+  // without each controller having to pass it manually</span>
+
+  res.locals.success = req.<span class="fn">flash</span>(<span class="str">'success'</span>);
+  res.locals.error   = req.<span class="fn">flash</span>(<span class="str">'error'</span>);
+  <span class="cmt">  // Read flash messages. This also CLEARS them so they only show once.
+  // navbar.ejs reads these and displays them as coloured banners.</span>
+
+  <span class="fn">next</span>();
+  <span class="cmt">  // Pass control to the next middleware/route in the stack.
+  // Without next(), the request would hang forever.</span>
+});</code></pre>
+
+  <h3>Error Handlers (Lines 70–85)</h3>
+  <pre><code><span class="cmt">// 404 — catches any request that didn't match a route above</span>
+app.<span class="fn">use</span>(<span class="fn">(req, res)</span> <span class="op">=></span> {
+  res.<span class="fn">status</span>(<span class="num">404</span>).<span class="fn">render</span>(<span class="str">'error'</span>, {
+    title: <span class="str">'404 Not Found'</span>,
+    message: <span class="str">'The page you are looking for does not exist.'</span>,
+  });
+});
+<span class="cmt">// Note: no 'next' parameter — this is a catch-all, not a pass-through</span>
+
+<span class="cmt">// Global error handler — catches errors thrown by next(err) in controllers</span>
+app.<span class="fn">use</span>(<span class="fn">(err, req, res, next)</span> <span class="op">=></span> {
+  <span class="cmt">// Express identifies error handlers by having EXACTLY 4 parameters (err, req, res, next)</span>
+  console.<span class="fn">error</span>(err.stack);
+  res.<span class="fn">status</span>(<span class="num">500</span>).<span class="fn">render</span>(<span class="str">'error'</span>, {
+    title: <span class="str">'Server Error'</span>,
+    message: err.message || <span class="str">'Something went wrong.'</span>,
+  });
+});</code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ DB -->
+<section id="db">
+  <span class="section-tag tag-server">Server</span>
+  <h2 class="section-title">config/db.js</h2>
+  <p class="section-path">project3/config/db.js</p>
+
+  <pre><code><span class="kw">const</span> mongoose = <span class="fn">require</span>(<span class="str">'mongoose'</span>);
+
+<span class="kw">const</span> connectDB = <span class="kw">async</span> () <span class="op">=></span> {
+  <span class="kw">try</span> {
+    <span class="kw">await</span> mongoose.<span class="fn">connect</span>(process.env.MONGO_URI);
+    <span class="cmt">    // mongoose.connect() returns a Promise.
+    // process.env.MONGO_URI is the Atlas connection string from .env
+    // This opens a persistent connection pool to MongoDB Atlas.</span>
+    console.<span class="fn">log</span>(<span class="str">'MongoDB Atlas connected'</span>);
+  } <span class="kw">catch</span> (err) {
+    console.<span class="fn">error</span>(<span class="str">'MongoDB connection error:'</span>, err.message);
+    process.<span class="fn">exit</span>(<span class="num">1</span>);
+    <span class="cmt">    // Exit code 1 = failure. If MongoDB doesn't connect,
+    // the app is useless — better to crash loudly than silently serve broken pages.</span>
+  }
+};
+
+module.exports = connectDB;</code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ MODEL USER -->
+<section id="model-user">
+  <span class="section-tag tag-model">Model</span>
+  <h2 class="section-title">User Model</h2>
+  <p class="section-path">project3/models/user.model.js</p>
+
+  <pre><code><span class="kw">const</span> mongoose = <span class="fn">require</span>(<span class="str">'mongoose'</span>);
+<span class="kw">const</span> bcrypt   = <span class="fn">require</span>(<span class="str">'bcryptjs'</span>);
+
+<span class="kw">const</span> userSchema = <span class="kw">new</span> mongoose.<span class="fn">Schema</span>(
+  {
+    username: {
+      type: String,
+      required: <span class="kw">true</span>,    <span class="cmt">// Mongoose rejects documents without this field</span>
+      unique: <span class="kw">true</span>,      <span class="cmt">// Creates a MongoDB unique index — two users can't share a username</span>
+      minlength: <span class="num">3</span>,      <span class="cmt">// Validates string length before saving</span>
+      trim: <span class="kw">true</span>,         <span class="cmt">// Auto-removes leading/trailing spaces from input</span>
+    },
+    email: {
+      type: String,
+      required: <span class="kw">true</span>,
+      unique: <span class="kw">true</span>,
+      trim: <span class="kw">true</span>,
+      lowercase: <span class="kw">true</span>,   <span class="cmt">// Auto-converts to lowercase before saving ("Michel@test.com" → "michel@test.com")</span>
+    },
+    passwordHash: {
+      type: String,
+      required: <span class="kw">true</span>,
+      <span class="cmt">// We NEVER store the raw password. Only the bcrypt hash is stored.
+      // Even if the database is breached, attacker cannot recover passwords.</span>
+    },
+    role: {
+      type: String,
+      enum: [<span class="str">'admin'</span>, <span class="str">'user'</span>],   <span class="cmt">// Only these two values are allowed</span>
+      default: <span class="str">'user'</span>,           <span class="cmt">// If not specified, default to 'user' (safer)</span>
+    },
+  },
+  { timestamps: <span class="kw">true</span> }
+  <span class="cmt">// timestamps: true auto-adds createdAt and updatedAt fields.
+  // Managed by Mongoose — you don't need to set them manually.</span>
+);
+
+userSchema.methods.<span class="fn">comparePassword</span> = <span class="kw">function</span> (password) {
+  <span class="kw">return</span> bcrypt.<span class="fn">compare</span>(password, <span class="kw">this</span>.passwordHash);
+  <span class="cmt">  // 'this' refers to the user document instance.
+  // bcrypt.compare() hashes the submitted password with the same salt
+  // that's embedded in the stored hash, then compares — returns a Promise&lt;boolean&gt;.
+  // Why a regular function (not arrow)? Arrow functions don't have their own 'this'.</span>
+};
+
+module.exports = mongoose.<span class="fn">model</span>(<span class="str">'User'</span>, userSchema);
+<span class="cmt">// 'User' = model name. Mongoose pluralises this to 'users' as the collection name.
+// This exports a class you can use to query: User.find(), User.create() etc.</span></code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ MODEL SONG -->
+<section id="model-artist">
+  <span class="section-tag tag-model">Model</span>
+  <h2 class="section-title">Artist Model</h2>
+  <p class="section-path">project3/models/artist.model.js</p>
+
+  <pre><code><span class="kw">const</span> artistSchema = <span class="kw">new</span> mongoose.<span class="fn">Schema</span>(
+  {
+    name:    { type: String, required: <span class="kw">true</span>, unique: <span class="kw">true</span>, trim: <span class="kw">true</span>, minlength: <span class="num">1</span> },
+    country: { type: String, default: <span class="str">'Unknown'</span>, trim: <span class="kw">true</span> },
+    bio:     { type: String, default: <span class="str">''</span>, trim: <span class="kw">true</span> },
+  },
+  { timestamps: <span class="kw">true</span> }
+);</code></pre>
+
+  <p>Simple schema. The <code>unique: true</code> on <code>name</code> creates a MongoDB unique index — attempting to save two artists with the same name throws a duplicate key error with <code>err.code === 11000</code>, which the controller catches and converts to a user-friendly message.</p>
+</section>
+
+<section id="model-song">
+  <span class="section-tag tag-model">Model</span>
+  <h2 class="section-title">Song Model</h2>
+  <p class="section-path">project3/models/song.model.js</p>
+
+  <pre><code><span class="kw">const</span> songSchema = <span class="kw">new</span> mongoose.<span class="fn">Schema</span>(
+  {
+    title: {
+      type: String, required: <span class="kw">true</span>, trim: <span class="kw">true</span>, minlength: <span class="num">1</span>,
+    },
+    duration: {
+      type: Number, required: <span class="kw">true</span>, min: <span class="num">1</span>,
+      <span class="cmt">// Stored in seconds. Views display it as MM:SS.
+      // min: 1 prevents saving a 0-second song.</span>
+    },
+    releaseYear: {
+      type: Number, required: <span class="kw">true</span>, min: <span class="num">1900</span>,
+      max: <span class="kw">new</span> <span class="fn">Date</span>().<span class="fn">getFullYear</span>() + <span class="num">1</span>,
+      <span class="cmt">// max is dynamic — computed once when the server starts.
+      // Allows saving songs from the current year + 1 for upcoming releases.</span>
+    },
+    artist: {
+      type: mongoose.Schema.Types.ObjectId,
+      <span class="cmt">      // ObjectId = MongoDB's built-in 12-byte unique identifier type
+      // Storing this instead of the full artist document keeps the data normalized.</span>
+      ref: <span class="str">'Artist'</span>,
+      <span class="cmt">      // 'Artist' tells Mongoose which model to use when .populate('artist') is called.
+      // Mongoose looks up the Artist model and finds the document with this _id.</span>
+      required: <span class="kw">true</span>,
+    },
+    playlists: [
+      { type: mongoose.Schema.Types.ObjectId, ref: <span class="str">'Playlist'</span> },
+      <span class="cmt">      // Array of ObjectIds — the many-to-many relationship.
+      // [] default means a new Song starts with no playlists.</span>
+    ],
+  },
+  { timestamps: <span class="kw">true</span> }
+);</code></pre>
+</section>
+
+<section id="model-playlist">
+  <span class="section-tag tag-model">Model</span>
+  <h2 class="section-title">Playlist Model</h2>
+  <p class="section-path">project3/models/playlist.model.js</p>
+
+  <pre><code><span class="kw">const</span> playlistSchema = <span class="kw">new</span> mongoose.<span class="fn">Schema</span>(
+  {
+    name:        { type: String, required: <span class="kw">true</span>, trim: <span class="kw">true</span>, minlength: <span class="num">1</span> },
+    description: { type: String, default: <span class="str">''</span>, trim: <span class="kw">true</span> },
+    songs: [
+      { type: mongoose.Schema.Types.ObjectId, ref: <span class="str">'Song'</span> },
+      <span class="cmt">      // The other side of the many-to-many.
+      // Both Song.playlists and Playlist.songs must be kept in sync manually.
+      // MongoDB has no foreign key cascades — the application layer is responsible.</span>
+    ],
+  },
+  { timestamps: <span class="kw">true</span> }
+);</code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ MIDDLEWARE -->
+<section id="mw-auth">
+  <span class="section-tag tag-middleware">Middleware</span>
+  <h2 class="section-title">requireAuth Middleware</h2>
+  <p class="section-path">project3/middleware/auth.js</p>
+
+  <pre><code><span class="kw">const</span> requireAuth = <span class="fn">(req, res, next)</span> <span class="op">=></span> {
+  <span class="kw">if</span> (!req.user) {
+    <span class="cmt">    // req.user was set (or left null) by the soft JWT decode in server.js.
+    // At this point it's already been decoded — no need to decode again here.
+    // null means either: no token cookie, expired token, or tampered token.</span>
+    req.<span class="fn">flash</span>(<span class="str">'error'</span>, <span class="str">'You must be logged in to access that page.'</span>);
+    <span class="cmt">    // Store an error message in the session — it will be displayed on the next page.</span>
+    <span class="kw">return</span> res.<span class="fn">redirect</span>(<span class="str">'/auth/login'</span>);
+    <span class="cmt">    // 'return' is critical here — without it, next() would also run
+    // (because there's no else), causing "Cannot set headers after they are sent".</span>
+  }
+  <span class="fn">next</span>();
+  <span class="cmt">  // User is authenticated → pass control to the next handler (the controller)</span>
+};</code></pre>
+
+  <h3>How it's used in routes</h3>
+  <pre><code><span class="cmt">// Multiple middleware can be chained on a route.
+// They run left to right. If any calls next(), the next one runs.
+// If any redirects, the chain stops.</span>
+
+router.<span class="fn">get</span>(<span class="str">'/'</span>, requireAuth, ctrl.index);
+<span class="cmt">// 1. requireAuth runs → checks req.user → passes → next()
+// 2. ctrl.index runs → fetches data → renders view</span>
+
+router.<span class="fn">post</span>(<span class="str">'/'</span>, requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.create);
+<span class="cmt">// 1. requireAuth → checks authentication
+// 2. requireRole('admin') → checks role
+// 3. ctrl.create → creates the record</span></code></pre>
+</section>
+
+<section id="mw-role">
+  <span class="section-tag tag-middleware">Middleware</span>
+  <h2 class="section-title">requireRole Middleware</h2>
+  <p class="section-path">project3/middleware/role.js</p>
+
+  <pre><code><span class="kw">const</span> requireRole = <span class="fn">(role)</span> <span class="op">=></span> <span class="fn">(req, res, next)</span> <span class="op">=></span> {
+  <span class="cmt">// This is a FACTORY FUNCTION — a function that RETURNS a function.
+  // requireRole('admin') returns a new middleware function.
+  // This lets you reuse the same logic for different roles:
+  // requireRole('admin'), requireRole('manager') etc.</span>
+
+  <span class="kw">if</span> (!req.user || req.user.role !== role) {
+    <span class="cmt">    // !req.user: catches the case where this middleware is used without requireAuth
+    // req.user.role !== role: the user exists but has the wrong role</span>
+    req.<span class="fn">flash</span>(<span class="str">'error'</span>, <span class="str">'You do not have permission to perform this action.'</span>);
+    <span class="kw">return</span> res.<span class="fn">redirect</span>(<span class="str">'/dashboard'</span>);
+    <span class="cmt">    // Redirect to dashboard (not login) — they are logged in, just not authorised</span>
+  }
+  <span class="fn">next</span>();
+};</code></pre>
+
+  <h3>Double Protection Pattern</h3>
+  <p>Authorization is enforced at two levels:</p>
+  <ol>
+    <li><strong>Backend:</strong> <code>requireRole('admin')</code> in routes — blocks the request before it reaches the controller, regardless of what the browser sends</li>
+    <li><strong>Frontend:</strong> EJS views only show Edit/Delete buttons when <code>currentUser.role === 'admin'</code></li>
+  </ol>
+  <div class="callout warn">
+    <strong>Why both layers?</strong> A malicious user could bypass the UI and send a POST request directly with curl or Postman. The backend middleware catches this. Never rely on hiding buttons as your only security.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ CTRL AUTH -->
+<section id="ctrl-auth">
+  <span class="section-tag tag-ctrl">Controller</span>
+  <h2 class="section-title">auth.controller — Line by Line</h2>
+  <p class="section-path">project3/controllers/auth.controller.js</p>
+
+  <h3>COOKIE_OPTIONS constant</h3>
+  <pre><code><span class="kw">const</span> COOKIE_OPTIONS = {
+  httpOnly: <span class="kw">true</span>,
+  <span class="cmt">  // httpOnly: true = JavaScript in the browser CANNOT read this cookie.
+  // document.cookie will not show it. Prevents XSS attacks from stealing the token.
+  // The browser still sends it automatically with every HTTP request.</span>
+
+  maxAge: <span class="num">7</span> * <span class="num">24</span> * <span class="num">60</span> * <span class="num">60</span> * <span class="num">1000</span>,
+  <span class="cmt">  // Cookie expiry in milliseconds: 7 days × 24h × 60min × 60sec × 1000ms
+  // After 7 days the browser deletes the cookie automatically.
+  // The JWT itself also expires at 7 days (expiresIn: '7d' below) — double protection.</span>
+};</code></pre>
+
+  <h3>postRegister</h3>
+  <pre><code>exports.postRegister = <span class="kw">async</span> <span class="fn">(req, res)</span> <span class="op">=></span> {
+  <span class="kw">try</span> {
+    <span class="kw">const</span> { username, email, password, role } = req.body;
+    <span class="cmt">    // Destructure form fields from req.body (parsed by express.urlencoded)</span>
+
+    <span class="kw">if</span> (!password || password.length < <span class="num">6</span>) {
+      req.<span class="fn">flash</span>(<span class="str">'error'</span>, <span class="str">'Password must be at least 6 characters.'</span>);
+      <span class="kw">return</span> res.<span class="fn">redirect</span>(<span class="str">'/auth/register'</span>);
+      <span class="cmt">      // Validate before hashing — no point calling bcrypt if input is invalid</span>
+    }
+
+    <span class="kw">const</span> passwordHash = <span class="kw">await</span> bcrypt.<span class="fn">hash</span>(password, <span class="num">12</span>);
+    <span class="cmt">    // 12 salt rounds. bcrypt generates a random salt internally,
+    // appends it to the hash output. This is why every hash looks different
+    // even for the same password.</span>
+
+    <span class="kw">await</span> User.<span class="fn">create</span>({ username, email, passwordHash, role: role || <span class="str">'user'</span> });
+    <span class="cmt">    // User.create() = new User({...}).save() in one step.
+    // role || 'user' = if role field was empty in form, default to 'user'</span>
+
+    req.<span class="fn">flash</span>(<span class="str">'success'</span>, <span class="str">'Account created! Please log in.'</span>);
+    res.<span class="fn">redirect</span>(<span class="str">'/auth/login'</span>);
+
+  } <span class="kw">catch</span> (err) {
+    req.<span class="fn">flash</span>(<span class="str">'error'</span>, err.code === <span class="num">11000</span> ?
+      <span class="str">'Username or email already taken.'</span> : err.message);
+    <span class="cmt">    // MongoDB duplicate key error code is 11000.
+    // We give a user-friendly message instead of the raw MongoDB error string.</span>
+    res.<span class="fn">redirect</span>(<span class="str">'/auth/register'</span>);
+  }
+};</code></pre>
+
+  <h3>postLogin</h3>
+  <pre><code>exports.postLogin = <span class="kw">async</span> <span class="fn">(req, res)</span> <span class="op">=></span> {
+  <span class="kw">try</span> {
+    <span class="kw">const</span> { email, password } = req.body;
+
+    <span class="kw">const</span> user = <span class="kw">await</span> User.<span class="fn">findOne</span>({ email });
+    <span class="cmt">    // Find user by email (email field has a unique index so this is efficient)</span>
+
+    <span class="kw">if</span> (!user || !(<span class="kw">await</span> user.<span class="fn">comparePassword</span>(password))) {
+      req.<span class="fn">flash</span>(<span class="str">'error'</span>, <span class="str">'Invalid email or password.'</span>);
+      <span class="kw">return</span> res.<span class="fn">redirect</span>(<span class="str">'/auth/login'</span>);
+      <span class="cmt">      // Both "user not found" and "wrong password" return the SAME message.
+      // This is intentional — telling attackers specifically which one failed
+      // would help them enumerate valid email addresses (user enumeration attack).</span>
+    }
+
+    <span class="kw">const</span> token = jwt.<span class="fn">sign</span>(
+      { id: user._id, username: user.username, role: user.role },
+      <span class="cmt">      // Payload: the data encoded in the token. Only put what you NEED.
+      // Don't include passwordHash or sensitive fields.</span>
+      process.env.JWT_SECRET || <span class="str">'fallback'</span>,
+      <span class="cmt">      // Signing secret — must match what jwt.verify() uses in server.js</span>
+      { expiresIn: <span class="str">'7d'</span> }
+      <span class="cmt">      // Token expires in 7 days. After that, verify() will throw TokenExpiredError.</span>
+    );
+
+    res.<span class="fn">cookie</span>(<span class="str">'token'</span>, token, COOKIE_OPTIONS);
+    <span class="cmt">    // Set the token as an httpOnly cookie on the response.
+    // The browser stores it and sends it automatically with every future request.</span>
+
+    req.<span class="fn">flash</span>(<span class="str">'success'</span>, `Welcome back, ${user.username}!`);
+    res.<span class="fn">redirect</span>(<span class="str">'/dashboard'</span>);
+  } <span class="kw">catch</span> (err) {
+    req.<span class="fn">flash</span>(<span class="str">'error'</span>, err.message);
+    res.<span class="fn">redirect</span>(<span class="str">'/auth/login'</span>);
+  }
+};</code></pre>
+
+  <h3>logout</h3>
+  <pre><code>exports.logout = <span class="fn">(req, res)</span> <span class="op">=></span> {
+  res.<span class="fn">clearCookie</span>(<span class="str">'token'</span>);
+  <span class="cmt">  // Tells the browser to delete the 'token' cookie.
+  // The next request will have no cookie → soft decode sets req.user = null
+  // → requireAuth will redirect to login.</span>
+  req.<span class="fn">flash</span>(<span class="str">'success'</span>, <span class="str">'You have been logged out.'</span>);
+  res.<span class="fn">redirect</span>(<span class="str">'/auth/login'</span>);
+};</code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ CTRL DASHBOARD -->
+<section id="ctrl-dashboard">
+  <span class="section-tag tag-ctrl">Controller</span>
+  <h2 class="section-title">dashboard.controller</h2>
+  <p class="section-path">project3/controllers/dashboard.controller.js</p>
+
+  <pre><code>exports.index = <span class="kw">async</span> <span class="fn">(req, res, next)</span> <span class="op">=></span> {
+  <span class="kw">try</span> {
+    <span class="kw">const</span> [artistCount, songCount, playlistCount] = <span class="kw">await</span> Promise.<span class="fn">all</span>([
+      Artist.<span class="fn">countDocuments</span>(),
+      Song.<span class="fn">countDocuments</span>(),
+      Playlist.<span class="fn">countDocuments</span>(),
+    ]);
+    <span class="cmt">    // Promise.all() runs all 3 queries IN PARALLEL.
+    // Each countDocuments() sends a query to MongoDB Atlas.
+    // Promise.all waits for ALL to finish before continuing.
+    // This is ~3x faster than running them sequentially with await one by one.
+    // countDocuments() with no filter = COUNT(*) in SQL terms.</span>
+
+    res.<span class="fn">render</span>(<span class="str">'dashboard/index'</span>, {
+      title: <span class="str">'Dashboard'</span>,
+      artistCount,   <span class="cmt">// e.g. 5</span>
+      songCount,     <span class="cmt">// e.g. 12</span>
+      playlistCount, <span class="cmt">// e.g. 3</span>
+    });
+    <span class="cmt">    // res.render(templatePath, dataObject)
+    // Express finds views/dashboard/index.ejs and passes the data object to it.
+    // Inside the template, artistCount is available as a local variable.</span>
+  } <span class="kw">catch</span> (err) {
+    <span class="fn">next</span>(err);
+    <span class="cmt">    // next(err) skips remaining middleware and goes straight to the
+    // global error handler in server.js (the 4-parameter function).</span>
+  }
+};</code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ CTRL ARTIST -->
+<section id="ctrl-artist">
+  <span class="section-tag tag-ctrl">Controller</span>
+  <h2 class="section-title">artist.controller — Line by Line</h2>
+  <p class="section-path">project3/controllers/artist.controller.js</p>
+
+  <h3>index — List all artists</h3>
+  <pre><code>exports.index = <span class="kw">async</span> <span class="fn">(req, res, next)</span> <span class="op">=></span> {
+  <span class="kw">const</span> artists = <span class="kw">await</span> Artist.<span class="fn">find</span>().<span class="fn">sort</span>({ name: <span class="num">1</span> });
+  <span class="cmt">  // Artist.find() with no filter = return ALL artist documents.
+  // .sort({ name: 1 }) = sort alphabetically ascending (1 = ascending, -1 = descending).
+  // Returns an array of Artist documents.</span>
+  res.<span class="fn">render</span>(<span class="str">'artists/index'</span>, { title: <span class="str">'Artists'</span>, artists });
+};</code></pre>
+
+  <h3>show — Single artist with their songs</h3>
+  <pre><code>exports.show = <span class="kw">async</span> <span class="fn">(req, res, next)</span> <span class="op">=></span> {
+  <span class="kw">const</span> artist = <span class="kw">await</span> Artist.<span class="fn">findById</span>(req.params.id);
+  <span class="cmt">  // req.params.id = the :id part of the URL (e.g. /artists/661abc → '661abc')
+  // findById() is shorthand for findOne({ _id: req.params.id })</span>
+
+  <span class="kw">if</span> (!artist)
+    <span class="kw">return</span> res.<span class="fn">status</span>(<span class="num">404</span>).<span class="fn">render</span>(<span class="str">'error'</span>, { title: <span class="str">'404'</span>, message: <span class="str">'Artist not found.'</span> });
+  <span class="cmt">  // findById returns null if the ID doesn't exist.
+  // We render the error page instead of letting the template crash on null.artist.name</span>
+
+  <span class="kw">const</span> songs = <span class="kw">await</span> Song.<span class="fn">find</span>({ artist: artist._id }).<span class="fn">sort</span>({ title: <span class="num">1</span> });
+  <span class="cmt">  // Find all songs where the artist field matches this artist's _id.
+  // We do NOT use populate on Artist because Artist has no songs field —
+  // we query the Song model instead.</span>
+
+  res.<span class="fn">render</span>(<span class="str">'artists/show'</span>, { title: artist.name, artist, songs });
+};</code></pre>
+
+  <h3>update — With runValidators</h3>
+  <pre><code>exports.update = <span class="kw">async</span> <span class="fn">(req, res, next)</span> <span class="op">=></span> {
+  <span class="kw">const</span> { name, country, bio } = req.body;
+  <span class="kw">await</span> Artist.<span class="fn">findByIdAndUpdate</span>(
+    req.params.id,
+    { name, country, bio },
+    { runValidators: <span class="kw">true</span> }
+    <span class="cmt">    // By default, findByIdAndUpdate() SKIPS schema validation.
+    // runValidators: true forces Mongoose to re-run the schema validators
+    // (required, minlength, unique etc.) on the update data.
+    // Without this, you could save an artist with an empty name.</span>
+  );
+};</code></pre>
+
+  <h3>destroy — Cascade delete with playlist cleanup</h3>
+  <pre><code>exports.destroy = <span class="kw">async</span> <span class="fn">(req, res, next)</span> <span class="op">=></span> {
+  <span class="cmt">  // Step 1: get all song IDs for this artist</span>
+  <span class="kw">const</span> songs = <span class="kw">await</span> Song.<span class="fn">find</span>({ artist: req.params.id }, <span class="str">'_id'</span>);
+  <span class="cmt">  // Second argument '_id' is a PROJECTION — only return the _id field.
+  // We don't need the full song documents, just their IDs. Faster query.</span>
+
+  <span class="kw">const</span> songIds = songs.<span class="fn">map</span>(s <span class="op">=></span> s._id);
+
+  <span class="kw">if</span> (songIds.length) {
+    <span class="kw">await</span> Playlist.<span class="fn">updateMany</span>(
+      { songs: { $in: songIds } },
+      <span class="cmt">      // $in: find playlists whose 'songs' array contains ANY of these IDs</span>
+      { $pull: { songs: { $in: songIds } } }
+      <span class="cmt">      // $pull: remove all matching values from the array in one atomic operation</span>
+    );
+  }
+  <span class="cmt">  // Step 2: delete songs</span>
+  <span class="kw">await</span> Song.<span class="fn">deleteMany</span>({ artist: req.params.id });
+
+  <span class="cmt">  // Step 3: delete artist</span>
+  <span class="kw">await</span> Artist.<span class="fn">findByIdAndDelete</span>(req.params.id);
+
+  req.<span class="fn">flash</span>(<span class="str">'success'</span>, <span class="str">'Artist and their songs deleted.'</span>);
+  res.<span class="fn">redirect</span>(<span class="str">'/artists'</span>);
+};</code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ CTRL SONG -->
+<section id="ctrl-song">
+  <span class="section-tag tag-ctrl">Controller</span>
+  <h2 class="section-title">song.controller — Line by Line</h2>
+  <p class="section-path">project3/controllers/song.controller.js</p>
+
+  <h3>index — With populate</h3>
+  <pre><code><span class="kw">const</span> songs = <span class="kw">await</span> Song.<span class="fn">find</span>().<span class="fn">populate</span>(<span class="str">'artist'</span>).<span class="fn">sort</span>({ title: <span class="num">1</span> });
+<span class="cmt">// .populate('artist') replaces the artist ObjectId stored in each song
+// with the full Artist document fetched from the 'artists' collection.
+// Before populate: song.artist = "661abc..."
+// After populate:  song.artist = { _id: "661abc", name: "Adele", country: "UK" }
+// This lets the template render song.artist.name directly.</span></code></pre>
+
+  <h3>show — Double populate</h3>
+  <pre><code><span class="kw">const</span> song = <span class="kw">await</span> Song.<span class="fn">findById</span>(req.params.id)
+  .<span class="fn">populate</span>(<span class="str">'artist'</span>)    <span class="cmt">// Replace artist ObjectId with full Artist doc</span>
+  .<span class="fn">populate</span>(<span class="str">'playlists'</span>); <span class="cmt">// Replace each playlist ObjectId with full Playlist doc</span>
+<span class="cmt">// Now the template can show: song.artist.name, song.playlists[0].name etc.</span></code></pre>
+
+  <h3>create — Array normalisation</h3>
+  <pre><code><span class="kw">const</span> playlistIds = playlists
+  ? Array.<span class="fn">isArray</span>(playlists) ? playlists : [playlists]
+  : [];
+<span class="cmt">// WHY: HTML multi-select sends different formats depending on how many are selected.
+// 0 selected:  req.body.playlists = undefined
+// 1 selected:  req.body.playlists = "661abc"     (a string)
+// 2+ selected: req.body.playlists = ["661abc", "662def"]  (an array)
+// We normalise to always be an array:
+//   undefined → []
+//   string    → ["661abc"]
+//   array     → (unchanged)</span>
+
+<span class="kw">const</span> song = <span class="kw">await</span> Song.<span class="fn">create</span>({ title, duration, releaseYear, artist, playlists: playlistIds });
+
+<span class="kw">if</span> (playlistIds.length) {
+  <span class="kw">await</span> Playlist.<span class="fn">updateMany</span>(
+    { _id: { $in: playlistIds } },
+    { $addToSet: { songs: song._id } }
+    <span class="cmt">    // $addToSet: add song._id to the songs array of every selected playlist.
+    // Only adds if not already present (prevents duplicates).</span>
+  );
+}</code></pre>
+
+  <h3>update — Full diff sync</h3>
+  <pre><code><span class="kw">const</span> existing = <span class="kw">await</span> Song.<span class="fn">findById</span>(req.params.id);
+<span class="kw">if</span> (!existing) {
+  req.<span class="fn">flash</span>(<span class="str">'error'</span>, <span class="str">'Song not found.'</span>);
+  <span class="kw">return</span> res.<span class="fn">redirect</span>(<span class="str">'/songs'</span>);
+  <span class="cmt">  // Null guard — if someone sends a PUT to a non-existent ID,
+  // existing would be null and existing.playlists would throw TypeError.</span>
+}
+<span class="kw">const</span> oldIds = existing.playlists.<span class="fn">map</span>(id <span class="op">=></span> id.<span class="fn">toString</span>());
+<span class="cmt">// .toString() converts ObjectId objects to plain strings for Array.includes() comparison
+// ObjectId('661') !== '661' as objects, but '661' === '661' as strings</span>
+
+<span class="kw">const</span> removed = oldIds.<span class="fn">filter</span>(id <span class="op">=></span> !newIds.<span class="fn">includes</span>(id));
+<span class="kw">const</span> added   = newIds.<span class="fn">filter</span>(id <span class="op">=></span> !oldIds.<span class="fn">includes</span>(id));
+<span class="cmt">// Array.filter returns a new array containing only elements that pass the test.
+// removed: elements in old that are NOT in new → need to $pull
+// added:   elements in new that are NOT in old → need to $addToSet</span></code></pre>
+
+  <h3>destroy — Clean up then delete</h3>
+  <pre><code><span class="kw">const</span> song = <span class="kw">await</span> Song.<span class="fn">findById</span>(req.params.id);
+<span class="kw">if</span> (song) {
+  <span class="kw">await</span> Playlist.<span class="fn">updateMany</span>(
+    { songs: song._id },
+    <span class="cmt">    // Find all playlists that contain this song's _id</span>
+    { $pull: { songs: song._id } }
+    <span class="cmt">    // Remove this song's _id from their songs array</span>
+  );
+  <span class="kw">await</span> song.<span class="fn">deleteOne</span>();
+  <span class="cmt">  // deleteOne() is called on the document instance (not the model class).
+  // This removes exactly this one document from the collection.</span>
+}</code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ CTRL PLAYLIST -->
+<section id="ctrl-playlist">
+  <span class="section-tag tag-ctrl">Controller</span>
+  <h2 class="section-title">playlist.controller — Key Parts</h2>
+  <p class="section-path">project3/controllers/playlist.controller.js</p>
+
+  <h3>show — Nested Populate</h3>
+  <pre><code><span class="kw">const</span> playlist = <span class="kw">await</span> Playlist.<span class="fn">findById</span>(req.params.id)
+  .<span class="fn">populate</span>({
+    path: <span class="str">'songs'</span>,
+    <span class="cmt">    // First populate songs: replace ObjectId array with full Song documents</span>
+    populate: { path: <span class="str">'artist'</span> }
+    <span class="cmt">    // Then for each populated Song, also populate its artist field.
+    // Result: playlist.songs[0].artist.name is accessible in the template.
+    // Without nested populate: playlist.songs[0].artist = "661abc" (just an ID)</span>
+  });</code></pre>
+
+  <h3>updateSongs — With null guard</h3>
+  <pre><code><span class="kw">const</span> playlist = <span class="kw">await</span> Playlist.<span class="fn">findById</span>(req.params.id);
+<span class="kw">if</span> (!playlist) {
+  req.<span class="fn">flash</span>(<span class="str">'error'</span>, <span class="str">'Playlist not found.'</span>);
+  <span class="kw">return</span> res.<span class="fn">redirect</span>(<span class="str">'/playlists'</span>);
+}
+<span class="cmt">// Same null guard pattern as song.update.
+// If someone sends POST to /playlists/invalid-id/songs, this prevents a crash.</span>
+
+playlist.songs = newIds;
+<span class="kw">await</span> playlist.<span class="fn">save</span>();
+<span class="cmt">// We modify the document instance directly and call .save()
+// instead of using findByIdAndUpdate() — this is valid Mongoose syntax.
+// .save() runs all Mongoose validators and saves all changes.</span></code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ ROUTES AUTH -->
+<section id="routes-auth">
+  <span class="section-tag tag-route">Route</span>
+  <h2 class="section-title">auth.routes</h2>
+  <p class="section-path">project3/routes/auth.routes.js</p>
+
+  <pre><code><span class="kw">const</span> router = express.<span class="fn">Router</span>();
+<span class="cmt">// Router() creates a mini Express app.
+// It has its own route definitions but shares the parent app's middleware.
+// In server.js: app.use('/auth', authRoutes) — all routes here are prefixed with /auth.</span>
+
+router.<span class="fn">get</span>(<span class="str">'/register'</span>, ctrl.getRegister);   <span class="cmt">// → GET /auth/register</span>
+router.<span class="fn">post</span>(<span class="str">'/register'</span>, ctrl.postRegister); <span class="cmt">// → POST /auth/register</span>
+router.<span class="fn">get</span>(<span class="str">'/login'</span>, ctrl.getLogin);         <span class="cmt">// → GET /auth/login</span>
+router.<span class="fn">post</span>(<span class="str">'/login'</span>, ctrl.postLogin);       <span class="cmt">// → POST /auth/login</span>
+router.<span class="fn">post</span>(<span class="str">'/logout'</span>, ctrl.logout);         <span class="cmt">// → POST /auth/logout</span>
+<span class="cmt">// No middleware guards — these routes must be publicly accessible.
+// Logout is POST (not GET) to prevent accidental logouts via link prefetch.</span></code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ ROUTES SONG -->
+<section id="routes-artist">
+  <span class="section-tag tag-route">Route</span>
+  <h2 class="section-title">artist.routes</h2>
+  <p class="section-path">project3/routes/artist.routes.js</p>
+
+  <pre><code>router.<span class="fn">get</span>(<span class="str">'/'</span>,        requireAuth,                       ctrl.index);
+router.<span class="fn">get</span>(<span class="str">'/:id'</span>,    requireAuth,                       ctrl.show);
+router.<span class="fn">get</span>(<span class="str">'/new'</span>,    requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.renderCreate);
+router.<span class="fn">post</span>(<span class="str">'/'</span>,      requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.create);
+router.<span class="fn">get</span>(<span class="str">'/:id/edit'</span>, requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.renderEdit);
+router.<span class="fn">put</span>(<span class="str">'/:id'</span>,    requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.update);
+router.<span class="fn">delete</span>(<span class="str">'/:id'</span>, requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.destroy);</code></pre>
+
+  <p><strong>Pattern:</strong> GET routes (read) only need <code>requireAuth</code>. POST/PUT/DELETE routes (write) need both <code>requireAuth</code> AND <code>requireRole('admin')</code>.</p>
+</section>
+
+<section id="routes-song">
+  <span class="section-tag tag-route">Route</span>
+  <h2 class="section-title">song.routes — Route Order Matters</h2>
+  <p class="section-path">project3/routes/song.routes.js</p>
+
+  <pre><code>router.<span class="fn">get</span>(<span class="str">'/'</span>,    requireAuth, ctrl.index);
+router.<span class="fn">get</span>(<span class="str">'/new'</span>, requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.renderCreate);
+router.<span class="fn">post</span>(<span class="str">'/'</span>,   requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.create);
+
+<span class="cmt">// ⚠️  IMPORTANT: relationship routes MUST come BEFORE /:id routes</span>
+router.<span class="fn">get</span>(<span class="str">'/:id/playlists'</span>,  requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.renderManagePlaylists);
+router.<span class="fn">post</span>(<span class="str">'/:id/playlists'</span>, requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.updatePlaylists);
+
+router.<span class="fn">get</span>(<span class="str">'/:id'</span>,      requireAuth, ctrl.show);
+router.<span class="fn">get</span>(<span class="str">'/:id/edit'</span>, requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.renderEdit);
+router.<span class="fn">put</span>(<span class="str">'/:id'</span>,      requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.update);
+router.<span class="fn">delete</span>(<span class="str">'/:id'</span>,   requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.destroy);</code></pre>
+
+  <div class="callout danger">
+    <strong>Why this order?</strong> If <code>router.get('/:id')</code> came first, a request to <code>/songs/new</code> would match <code>/:id</code> with <code>id = "new"</code>. Express matches routes top-to-bottom and stops at the first match. Static paths (<code>/new</code>) must always come before dynamic ones (<code>/:id</code>). Same applies to <code>/:id/playlists</code> vs <code>/:id</code>.
+  </div>
+</section>
+
+<section id="routes-playlist">
+  <span class="section-tag tag-route">Route</span>
+  <h2 class="section-title">playlist.routes</h2>
+  <p class="section-path">project3/routes/playlist.routes.js</p>
+  <p>Identical pattern to song.routes — relationship routes <code>/:id/songs</code> defined before <code>/:id</code>.</p>
+
+  <pre><code>router.<span class="fn">get</span>(<span class="str">'/:id/songs'</span>,  requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.renderManageSongs);
+router.<span class="fn">post</span>(<span class="str">'/:id/songs'</span>, requireAuth, <span class="fn">requireRole</span>(<span class="str">'admin'</span>), ctrl.updateSongs);
+<span class="cmt">// Must be before /:id so 'songs' isn't treated as an ID value</span>
+router.<span class="fn">get</span>(<span class="str">'/:id'</span>, requireAuth, ctrl.show);
+<span class="cmt">// ...</span></code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ EJS SYNTAX -->
+<section id="views-ejs-syntax">
+  <span class="section-tag tag-view">View</span>
+  <h2 class="section-title">EJS Syntax — Complete Reference</h2>
+
+  <p>EJS (Embedded JavaScript) lets you embed JavaScript directly inside HTML templates. The server runs the JavaScript and sends back plain HTML to the browser.</p>
+
+  <table>
+    <thead><tr><th>Tag</th><th>Purpose</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td><code>&lt;%= expr %&gt;</code></td><td>Output — evaluates expr and inserts the result into HTML. Escapes HTML entities (prevents XSS).</td><td><code>&lt;%= user.name %&gt;</code> → <code>Michel</code></td></tr>
+      <tr><td><code>&lt;%- expr %&gt;</code></td><td>Output — same but UNESCAPED. Use only for trusted HTML like includes.</td><td><code>&lt;%- include('partials/header') %&gt;</code></td></tr>
+      <tr><td><code>&lt;% stmt %&gt;</code></td><td>Execute JS without output — if/else, loops, variable declarations.</td><td><code>&lt;% if (currentUser) { %&gt;</code></td></tr>
+      <tr><td><code>&lt;%# comment %&gt;</code></td><td>EJS comment — not included in output HTML.</td><td><code>&lt;%# This is a comment %&gt;</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Conditionals</h3>
+  <pre><code><span class="cmt">&lt;!-- Show admin buttons only to admins --&gt;</span>
+&lt;<span class="kw">%</span> <span class="kw">if</span> (currentUser.role === <span class="str">'admin'</span>) { <span class="kw">%&gt;</span>
+  &lt;a href=<span class="str">"/artists/new"</span>&gt;+ Add Artist&lt;/a&gt;
+&lt;<span class="kw">%</span> } <span class="kw">%&gt;</span>
+
+<span class="cmt">&lt;!-- If/else --&gt;</span>
+&lt;<span class="kw">%</span> <span class="kw">if</span> (artists.length === <span class="num">0</span>) { <span class="kw">%&gt;</span>
+  &lt;p&gt;No artists yet.&lt;/p&gt;
+&lt;<span class="kw">%</span> } <span class="kw">else</span> { <span class="kw">%&gt;</span>
+  &lt;p&gt;<span class="kw">&lt;%=</span> artists.length <span class="kw">%&gt;</span> artists found.&lt;/p&gt;
+&lt;<span class="kw">%</span> } <span class="kw">%&gt;</span></code></pre>
+
+  <h3>Loops</h3>
+  <pre><code>&lt;tbody&gt;
+  &lt;<span class="kw">%</span> songs.<span class="fn">forEach</span>(song <span class="op">=&gt;</span> { <span class="kw">%&gt;</span>
+  &lt;tr&gt;
+    &lt;td&gt;<span class="kw">&lt;%=</span> song.title <span class="kw">%&gt;</span>&lt;/td&gt;
+    &lt;td&gt;<span class="kw">&lt;%=</span> song.artist.name <span class="kw">%&gt;</span>&lt;/td&gt;
+    &lt;td&gt;
+      <span class="cmt">&lt;!-- Format duration: 213s → 3:33 --&gt;</span>
+      <span class="kw">&lt;%=</span> Math.<span class="fn">floor</span>(song.duration / <span class="num">60</span>) <span class="kw">%&gt;</span>:<span class="kw">&lt;%=</span> String(song.duration % <span class="num">60</span>).<span class="fn">padStart</span>(<span class="num">2</span>, <span class="str">'0'</span>) <span class="kw">%&gt;</span>
+    &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;<span class="kw">%</span> }) <span class="kw">%&gt;</span>
+&lt;/tbody&gt;</code></pre>
+
+  <h3>Includes (Partials)</h3>
+  <pre><code><span class="cmt">&lt;!-- From views/songs/index.ejs, include views/partials/header.ejs --&gt;</span>
+&lt;<span class="kw">%-</span> <span class="fn">include</span>(<span class="str">'../partials/header'</span>) <span class="kw">%&gt;</span>
+<span class="cmt">&lt;!-- Path is RELATIVE to the current template file.
+     ../partials means: go up one folder, then into partials/
+     EJS automatically appends .ejs extension.
+     The included file has access to ALL variables in scope (title, currentUser etc.) --&gt;</span></code></pre>
+
+  <h3>Dynamic Attributes (pre-filled forms)</h3>
+  <pre><code><span class="cmt">&lt;!-- Edit form: pre-select the current artist in a dropdown --&gt;</span>
+&lt;select name=<span class="str">"artist"</span>&gt;
+  &lt;<span class="kw">%</span> artists.<span class="fn">forEach</span>(a <span class="op">=&gt;</span> { <span class="kw">%&gt;</span>
+    &lt;option value=<span class="str">"&lt;%=</span> <span class="kw">a._id</span> <span class="str">%&gt;"</span>
+      &lt;<span class="kw">%=</span> a._id.<span class="fn">toString</span>() === song.artist.<span class="fn">toString</span>() ? <span class="str">'selected'</span> : <span class="str">''</span> <span class="kw">%&gt;</span>
+    &gt;
+      &lt;<span class="kw">%=</span> a.name <span class="kw">%&gt;</span>
+    &lt;/option&gt;
+  &lt;<span class="kw">%</span> }) <span class="kw">%&gt;</span>
+&lt;/select&gt;
+<span class="cmt">&lt;!-- .toString() comparison: ObjectId !== ObjectId by reference, but "abc" === "abc" --&gt;</span></code></pre>
+
+  <h3>PUT/DELETE Forms with method-override</h3>
+  <pre><code><span class="cmt">&lt;!-- HTML forms only support GET and POST.
+     method-override reads ?_method= from the query string and rewrites req.method. --&gt;</span>
+
+&lt;form action=<span class="str">"/artists/&lt;%= artist._id %&gt;?_method=DELETE"</span> method=<span class="str">"POST"</span>
+      onsubmit=<span class="str">"return confirm('Delete this artist?')"</span>&gt;
+  &lt;button type=<span class="str">"submit"</span>&gt;Delete&lt;/button&gt;
+&lt;/form&gt;
+<span class="cmt">&lt;!-- ?_method=DELETE tells method-override to change this POST into DELETE.
+     onsubmit confirm dialog prevents accidental deletions. --&gt;</span></code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ VIEWS PARTIALS -->
+<section id="views-partials">
+  <span class="section-tag tag-view">View</span>
+  <h2 class="section-title">Partials — navbar.ejs Deep Dive</h2>
+  <p class="section-path">project3/views/partials/</p>
+
+  <p>Three partials are included by every single view: <code>header.ejs</code> opens the HTML document, <code>navbar.ejs</code> renders the navigation bar and flash messages, <code>footer.ejs</code> closes everything.</p>
+
+  <h3>navbar.ejs — Full Source Explained</h3>
+  <pre><code>&lt;nav class=<span class="str">"navbar"</span>&gt;
+  &lt;a class=<span class="str">"navbar-brand"</span> href=<span class="str">"/dashboard"</span>&gt;♫ MusicApp&lt;/a&gt;
+
+  &lt;button class=<span class="str">"navbar-toggle"</span> id=<span class="str">"navToggle"</span> aria-label=<span class="str">"Toggle navigation"</span>&gt;☰&lt;/button&gt;
+  <span class="cmt">&lt;!-- Hamburger button — only visible on mobile (CSS: display:none, shown at 768px) --&gt;</span>
+
+  &lt;ul class=<span class="str">"navbar-links"</span> id=<span class="str">"navLinks"</span>&gt;
+    &lt;<span class="kw">%</span> <span class="kw">if</span> (currentUser) { <span class="kw">%&gt;</span>
+      <span class="cmt">&lt;!-- currentUser is set by res.locals in server.js — available in all views --&gt;</span>
+      &lt;li&gt;&lt;a href=<span class="str">"/artists"</span>&gt;Artists&lt;/a&gt;&lt;/li&gt;
+      &lt;li&gt;&lt;a href=<span class="str">"/songs"</span>&gt;Songs&lt;/a&gt;&lt;/li&gt;
+      &lt;li&gt;&lt;a href=<span class="str">"/playlists"</span>&gt;Playlists&lt;/a&gt;&lt;/li&gt;
+      &lt;li class=<span class="str">"navbar-user"</span>&gt;
+        &lt;span class=<span class="str">"user-badge"</span>&gt;
+          <span class="kw">&lt;%=</span> currentUser.username <span class="kw">%&gt;</span>
+          &lt;span class=<span class="str">"role-badge role-&lt;%= currentUser.role %&gt;"</span>&gt;
+            <span class="kw">&lt;%=</span> currentUser.role <span class="kw">%&gt;</span>
+            <span class="cmt">&lt;!-- role-admin gets purple badge, role-user gets cyan — CSS handles this --&gt;</span>
+          &lt;/span&gt;
+        &lt;/span&gt;
+        &lt;form action=<span class="str">"/auth/logout"</span> method=<span class="str">"POST"</span>&gt;
+          &lt;button type=<span class="str">"submit"</span>&gt;Logout&lt;/button&gt;
+          <span class="cmt">&lt;!-- Logout is a form submission (POST), not a link (GET).
+               Prevents browser preloading from accidentally logging user out. --&gt;</span>
+        &lt;/form&gt;
+      &lt;/li&gt;
+    &lt;<span class="kw">%</span> } <span class="kw">else</span> { <span class="kw">%&gt;</span>
+      &lt;li&gt;&lt;a href=<span class="str">"/auth/login"</span>&gt;Login&lt;/a&gt;&lt;/li&gt;
+      &lt;li&gt;&lt;a href=<span class="str">"/auth/register"</span>&gt;Register&lt;/a&gt;&lt;/li&gt;
+    &lt;<span class="kw">%</span> } <span class="kw">%&gt;</span>
+  &lt;/ul&gt;
+&lt;/nav&gt;
+
+<span class="cmt">&lt;!-- Flash messages — displayed once, then cleared by connect-flash --&gt;</span>
+&lt;<span class="kw">%</span> <span class="kw">if</span> (success && success.length > <span class="num">0</span>) { <span class="kw">%&gt;</span>
+  &lt;div class=<span class="str">"flash flash-success"</span>&gt;<span class="kw">&lt;%=</span> success[<span class="num">0</span>] <span class="kw">%&gt;</span>&lt;/div&gt;
+&lt;<span class="kw">%</span> } <span class="kw">%&gt;</span>
+&lt;<span class="kw">%</span> <span class="kw">if</span> (error && error.length > <span class="num">0</span>) { <span class="kw">%&gt;</span>
+  &lt;div class=<span class="str">"flash flash-error"</span>&gt;<span class="kw">&lt;%=</span> error[<span class="num">0</span>] <span class="kw">%&gt;</span>&lt;/div&gt;
+&lt;<span class="kw">%</span> } <span class="kw">%&gt;</span>
+
+&lt;main class=<span class="str">"main-content"</span>&gt;
+<span class="cmt">&lt;!-- &lt;main&gt; is opened here. footer.ejs closes it with &lt;/main&gt;.
+     All page content goes inside this wrapper. --&gt;</span></code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ VIEWS AUTH -->
+<section id="views-auth">
+  <span class="section-tag tag-view">View</span>
+  <h2 class="section-title">Auth Views</h2>
+  <p class="section-path">project3/views/auth/</p>
+
+  <h3>register.ejs — Role Selection</h3>
+  <pre><code>&lt;form action=<span class="str">"/auth/register"</span> method=<span class="str">"POST"</span> class=<span class="str">"form"</span>&gt;
+  &lt;input type=<span class="str">"text"</span>     name=<span class="str">"username"</span>   minlength=<span class="str">"3"</span>   required /&gt;
+  &lt;input type=<span class="str">"email"</span>    name=<span class="str">"email"</span>                  required /&gt;
+  &lt;input type=<span class="str">"password"</span> name=<span class="str">"password"</span>  minlength=<span class="str">"6"</span>   required /&gt;
+
+  &lt;select name=<span class="str">"role"</span>&gt;
+    &lt;option value=<span class="str">"user"</span>&gt;User (read-only)&lt;/option&gt;
+    &lt;option value=<span class="str">"admin"</span>&gt;Admin (full access)&lt;/option&gt;
+  &lt;/select&gt;
+  <span class="cmt">&lt;!-- In a real production app you would NOT let users choose admin role.
+       This is for demo/grading purposes. --&gt;</span>
+
+  &lt;button type=<span class="str">"submit"</span>&gt;Create Account&lt;/button&gt;
+&lt;/form&gt;</code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ VIEWS DASHBOARD -->
+<section id="views-dashboard">
+  <span class="section-tag tag-view">View</span>
+  <h2 class="section-title">Dashboard View</h2>
+  <p class="section-path">project3/views/dashboard/index.ejs</p>
+
+  <pre><code><span class="cmt">&lt;!-- Stat cards — each is a clickable link with a count --&gt;</span>
+&lt;div class=<span class="str">"stats-grid"</span>&gt;
+  <span class="cmt">&lt;!-- CSS Grid: 3 equal columns --&gt;</span>
+  &lt;a href=<span class="str">"/artists"</span> class=<span class="str">"stat-card"</span>&gt;
+    &lt;div class=<span class="str">"stat-icon"</span>&gt;🎤&lt;/div&gt;
+    &lt;div class=<span class="str">"stat-value"</span>&gt;<span class="kw">&lt;%=</span> artistCount <span class="kw">%&gt;</span>&lt;/div&gt;
+    <span class="cmt">&lt;!-- artistCount was passed by dashboard.controller.index --&gt;</span>
+    &lt;div class=<span class="str">"stat-label"</span>&gt;Artists&lt;/div&gt;
+  &lt;/a&gt;
+  <span class="cmt">&lt;!-- ... song card, playlist card ... --&gt;</span>
+&lt;/div&gt;
+
+<span class="cmt">&lt;!-- Admin-only quick actions --&gt;</span>
+&lt;<span class="kw">%</span> <span class="kw">if</span> (currentUser.role === <span class="str">'admin'</span>) { <span class="kw">%&gt;</span>
+  &lt;a href=<span class="str">"/artists/new"</span>&gt;+ Add Artist&lt;/a&gt;
+  &lt;a href=<span class="str">"/songs/new"</span>&gt;+ Add Song&lt;/a&gt;
+  &lt;a href=<span class="str">"/playlists/new"</span>&gt;+ Create Playlist&lt;/a&gt;
+&lt;<span class="kw">%</span> } <span class="kw">%&gt;</span></code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ VIEWS CRUD -->
+<section id="views-crud">
+  <span class="section-tag tag-view">View</span>
+  <h2 class="section-title">CRUD Views — Pattern &amp; Key Code</h2>
+
+  <p>Each entity (Artist, Song, Playlist) has 4 standard views: <code>index</code>, <code>show</code>, <code>create</code>, <code>edit</code>. They all follow the same pattern.</p>
+
+  <h3>index.ejs — Table with conditional action buttons</h3>
+  <pre><code>&lt;table class=<span class="str">"table"</span>&gt;
+  &lt;tbody&gt;
+    &lt;<span class="kw">%</span> artists.<span class="fn">forEach</span>(artist <span class="op">=&gt;</span> { <span class="kw">%&gt;</span>
+    &lt;tr&gt;
+      &lt;td&gt;&lt;a href=<span class="str">"/artists/&lt;%= artist._id %&gt;"</span>&gt;<span class="kw">&lt;%=</span> artist.name <span class="kw">%&gt;</span>&lt;/a&gt;&lt;/td&gt;
+      &lt;td&gt;<span class="kw">&lt;%=</span> artist.country <span class="kw">%&gt;</span>&lt;/td&gt;
+      &lt;td class=<span class="str">"actions"</span>&gt;
+        &lt;a href=<span class="str">"/artists/&lt;%= artist._id %&gt;"</span>&gt;View&lt;/a&gt;
+        &lt;<span class="kw">%</span> <span class="kw">if</span> (currentUser.role === <span class="str">'admin'</span>) { <span class="kw">%&gt;</span>
+          &lt;a href=<span class="str">"/artists/&lt;%= artist._id %&gt;/edit"</span>&gt;Edit&lt;/a&gt;
+          &lt;form action=<span class="str">"/artists/&lt;%= artist._id %&gt;?_method=DELETE"</span> method=<span class="str">"POST"</span>
+                onsubmit=<span class="str">"return confirm('Delete?')"</span>&gt;
+            &lt;button&gt;Delete&lt;/button&gt;
+          &lt;/form&gt;
+        &lt;<span class="kw">%</span> } <span class="kw">%&gt;</span>
+      &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;<span class="kw">%</span> }) <span class="kw">%&gt;</span>
+  &lt;/tbody&gt;
+&lt;/table&gt;</code></pre>
+
+  <h3>Duration Formatting (songs)</h3>
+  <pre><code><span class="cmt">&lt;!-- Convert 213 seconds to "3:33" --&gt;</span>
+<span class="kw">&lt;%=</span> Math.<span class="fn">floor</span>(song.duration / <span class="num">60</span>) <span class="kw">%&gt;</span>:<span class="kw">&lt;%=</span> String(song.duration % <span class="num">60</span>).<span class="fn">padStart</span>(<span class="num">2</span>, <span class="str">'0'</span>) <span class="kw">%&gt;</span>
+<span class="cmt">&lt;!-- Math.floor(213 / 60) = 3  (minutes)
+     213 % 60 = 33           (remaining seconds)
+     String(33).padStart(2, '0') = "33"
+     String(3).padStart(2, '0')  = "03" (for single-digit seconds) --&gt;</span></code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ VIEWS REL -->
+<section id="views-rel">
+  <span class="section-tag tag-view">View</span>
+  <h2 class="section-title">Relationship Views — Full Deep Dive</h2>
+  <p class="section-path">views/songs/manage-playlists.ejs &amp; views/playlists/manage-songs.ejs</p>
+
+  <p>These views allow admins to manage many-to-many relationships via checkboxes. Here is the full manage-playlists.ejs with explanation:</p>
+
+  <pre><code><span class="cmt">&lt;!-- form submits to POST /songs/:id/playlists --&gt;</span>
+&lt;form action=<span class="str">"/songs/&lt;%= song._id %&gt;/playlists"</span> method=<span class="str">"POST"</span>&gt;
+
+  &lt;<span class="kw">%</span> <span class="kw">const</span> currentIds = song.playlists.<span class="fn">map</span>(pl <span class="op">=&gt;</span> pl._id.<span class="fn">toString</span>()); <span class="kw">%&gt;</span>
+  <span class="cmt">&lt;!-- song.playlists is populated — full Playlist docs, not just IDs.
+       We extract just the string IDs for comparison below. --&gt;</span>
+
+  &lt;<span class="kw">%</span> allPlaylists.<span class="fn">forEach</span>(pl <span class="op">=&gt;</span> { <span class="kw">%&gt;</span>
+    &lt;label class=<span class="str">"checkbox-item"</span>&gt;
+      &lt;input
+        type=<span class="str">"checkbox"</span>
+        name=<span class="str">"playlists"</span>
+        <span class="cmt">&lt;!-- All checkboxes share the same name. When submitted, Express collects
+             all checked values into req.body.playlists as an array. --&gt;</span>
+        value=<span class="str">"&lt;%= pl._id %&gt;"</span>
+        <span class="cmt">&lt;!-- value = the playlist's MongoDB _id --&gt;</span>
+        &lt;<span class="kw">%=</span> currentIds.<span class="fn">includes</span>(pl._id.<span class="fn">toString</span>()) ? <span class="str">'checked'</span> : <span class="str">''</span> <span class="kw">%&gt;</span>
+        <span class="cmt">&lt;!-- If this playlist is already associated with the song, pre-check it. --&gt;</span>
+      /&gt;
+      &lt;span&gt;<span class="kw">&lt;%=</span> pl.name <span class="kw">%&gt;</span>&lt;/span&gt;
+    &lt;/label&gt;
+  &lt;<span class="kw">%</span> }) <span class="kw">%&gt;</span>
+
+  &lt;button type=<span class="str">"submit"</span>&gt;Save Assignments&lt;/button&gt;
+&lt;/form&gt;
+
+<span class="cmt">&lt;!-- When form submits:
+     0 checked  → req.body.playlists = undefined → normalised to []
+     1 checked  → req.body.playlists = "661abc"  → normalised to ["661abc"]
+     2+ checked → req.body.playlists = ["661abc","662def"] (already an array)
+     Controller diffs old vs new and syncs both sides. --&gt;</span></code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ DEPLOY ENV -->
+<section id="deploy-env">
+  <span class="section-tag tag-deploy">Deployment</span>
+  <h2 class="section-title">Environment Variables</h2>
+  <p class="section-path">project3/.env.example</p>
+
+  <pre><code>MONGO_URI=mongodb+srv://&lt;user&gt;:&lt;password&gt;@cluster0.xxxxx.mongodb.net/musicapp?retryWrites=true&w=majority
+JWT_SECRET=k9#mXpQ2$vLnR7@wZtYu8*dFhCjA4!sBqN6^eKgP3&mWxVoT5iDlUy
+SESSION_SECRET=H2$nBpW8@rLqX4!mZtVuY6*kFsC9^dAeG3&jNwP7#vKoT5iDlUyQxR
+PORT=3000</code></pre>
+
+  <table>
+    <thead><tr><th>Variable</th><th>Used in</th><th>What happens if missing</th></tr></thead>
+    <tbody>
+      <tr><td><code>MONGO_URI</code></td><td><code>config/db.js</code></td><td>Server exits with <code>process.exit(1)</code></td></tr>
+      <tr><td><code>JWT_SECRET</code></td><td><code>server.js</code> (verify), <code>auth.controller</code> (sign)</td><td>Falls back to <code>'fallback'</code> — all existing tokens become invalid if secret changes</td></tr>
+      <tr><td><code>SESSION_SECRET</code></td><td><code>express-session</code> in <code>server.js</code></td><td>Falls back to <code>'changeme'</code> — flash messages still work but session cookies are insecure</td></tr>
+      <tr><td><code>NODE_ENV</code></td><td><code>server.js</code> session cookie</td><td>Cookie <code>secure</code> is false — fine for HTTP dev, should be <code>production</code> on Render</td></tr>
+      <tr><td><code>PORT</code></td><td><code>server.js</code> <code>app.listen()</code></td><td>Defaults to 3000 — Render overrides this with its own port automatically</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout danger">
+    <strong>Never commit <code>.env</code> to Git.</strong> The <code>.gitignore</code> excludes it. Only commit <code>.env.example</code> with placeholder values. Set real values directly in Render's environment variables panel.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ DEPLOY ATLAS -->
+<section id="deploy-atlas">
+  <span class="section-tag tag-deploy">Deployment</span>
+  <h2 class="section-title">MongoDB Atlas</h2>
+
+  <h3>Connection String Anatomy</h3>
+  <pre><code>mongodb+srv://michel:mypassword@cluster0.abc12.mongodb.net/musicapp?retryWrites=true&w=majority
+│             │       │          │                        │        │
+│             │       │          │                        │        └─ w=majority: write must be acknowledged by majority of nodes
+│             │       │          │                        └────────── database name inside the cluster
+│             │       │          └─────────────────────────────────── Atlas cluster hostname
+│             │       └────────────────────────────────────────────── DB user password
+│             └────────────────────────────────────────────────────── DB username
+└──────────────────────────────────────────────────────────────────── srv = DNS seedlist format (auto-discovers replica set members)</code></pre>
+
+  <h3>Why <code>0.0.0.0/0</code> Network Access</h3>
+  <p>Render runs your app on different servers every time it deploys. These servers have dynamic IP addresses that change unpredictably. You cannot whitelist a specific IP. Allowing <code>0.0.0.0/0</code> (all IPs) is the standard practice for Render deployments. The connection is still secure because it requires valid MongoDB credentials.</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ DEPLOY RENDER -->
+<section id="deploy-render">
+  <span class="section-tag tag-deploy">Deployment</span>
+  <h2 class="section-title">Render Configuration</h2>
+
+  <table>
+    <thead><tr><th>Setting</th><th>Value</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Runtime</td><td>Node</td><td>Server is a Node.js app</td></tr>
+      <tr><td>Build Command</td><td><code>npm install</code></td><td>Installs all dependencies from package.json</td></tr>
+      <tr><td>Start Command</td><td><code>node server.js</code></td><td>Runs the entry point directly — no build step needed</td></tr>
+      <tr><td>Branch</td><td><code>main</code></td><td>Render watches this branch for auto-deploy</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <strong>Free Tier Spin-Down:</strong> Render's free tier spins the app down after 15 minutes of no traffic. The first request after inactivity takes 30–60 seconds to wake up. This is normal behaviour on the free plan.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ DEPLOY CICD -->
+<section id="deploy-cicd">
+  <span class="section-tag tag-deploy">Deployment</span>
+  <h2 class="section-title">CI/CD Pipeline — Line by Line</h2>
+  <p class="section-path">project3/.github/workflows/deploy.yml</p>
+
+  <pre><code><span class="fn">name:</span> Auto Deploy to Render
+<span class="cmt"># Display name shown in GitHub Actions tab</span>
+
+<span class="fn">on:</span>
+  <span class="fn">push:</span>
+    <span class="fn">branches:</span>
+      - main
+<span class="cmt"># TRIGGER: this workflow runs ONLY when code is pushed to the 'main' branch.
+# Pushes to other branches (feature branches) do NOT trigger a deploy.
+# Pull request merges into main DO trigger it.</span>
+
+<span class="fn">jobs:</span>
+  <span class="fn">deploy:</span>
+    <span class="cmt">    # Job name — can be anything</span>
+    <span class="fn">runs-on:</span> ubuntu-latest
+    <span class="cmt">    # GitHub provides a fresh Ubuntu virtual machine to run this job.
+    # The VM is thrown away after the job completes.</span>
+    <span class="fn">steps:</span>
+      - <span class="fn">name:</span> Trigger Render Deploy Hook
+        <span class="fn">run:</span> |
+          curl -X POST <span class="str">"${{ secrets.RENDER_DEPLOY_HOOK_URL }}"</span>
+          <span class="cmt">          # curl = command-line HTTP client (built into Ubuntu)
+          # -X POST = send an HTTP POST request
+          # The URL is the Render deploy hook (stored as a GitHub secret)
+          # When Render receives this POST, it immediately starts a new deployment:
+          #   1. Pulls the latest commit from GitHub
+          #   2. Runs 'npm install'
+          #   3. Runs 'node server.js'
+          #   4. Replaces the old instance with the new one
+          # ${{ secrets.RENDER_DEPLOY_HOOK_URL }} = reads the GitHub Actions secret.
+          # Secrets are encrypted in GitHub and never appear in logs.</span></code></pre>
+
+  <h3>Full Pipeline Flow</h3>
+  <div class="flow">You edit code in VS Code
+  ↓
+<span class="hi">git add .</span>  →  <span class="hi">git commit -m "..."</span>
+  ↓
+<span class="hi">git push origin main</span>
+  ↓  (GitHub receives the push)
+<span class="ho">GitHub Actions</span> detects push to main branch
+  → Allocates Ubuntu VM
+  → Runs deploy.yml
+  → Executes: <span class="hr">curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"</span>
+  ↓
+<span class="hp">Render</span> receives the POST on its deploy hook endpoint
+  → Pulls latest commit from GitHub repo
+  → Runs: <span class="hi">npm install</span>
+  → Runs: <span class="hi">node server.js</span>
+  → Health check passes
+  → Swaps traffic to new instance
+  ↓
+<span class="hy">~2 minutes</span> after git push → new code is live at
+<span class="hl">https://project3-music-app.onrender.com</span></div>
+
+  <h3>Testing the CI/CD (Oral Eval Demo)</h3>
+  <ol>
+    <li>Open <code>views/dashboard/index.ejs</code> — change the heading text</li>
+    <li>Run: <code>git add . &amp;&amp; git commit -m "demo: ci/cd test" &amp;&amp; git push</code></li>
+    <li>GitHub → <strong>Actions tab</strong> → see workflow running (yellow circle) → completed (green check)</li>
+    <li>Render → <strong>Logs tab</strong> → see new deploy started</li>
+    <li>Refresh the live URL → changed heading is visible</li>
+  </ol>
+
+  <div class="callout ok">
+    <strong>What to say during oral eval:</strong> "The CI/CD pipeline automatically redeploys the app every time I push to main. GitHub Actions detects the push, runs the workflow, and calls Render's deploy hook URL. Render then pulls the new code and restarts the server. This follows the four steps in the project spec: edit locally → commit → push to GitHub → GitHub Actions redeploys to Render."
+  </div>
+</section>
+
+</main>
+
+<script>
+  const toggle = document.getElementById('toc-toggle');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  const body = document.body;
+  toggle.addEventListener('click', () => body.classList.add('sidebar-open'));
+  backdrop.addEventListener('click', () => body.classList.remove('sidebar-open'));
+</script>
+</body>
+</html>

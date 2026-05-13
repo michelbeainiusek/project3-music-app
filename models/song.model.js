@@ -22,7 +22,7 @@ const songSchema = new mongoose.Schema(
     artist: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Artist',
-      required: true,
+      required: true, // song must have an artist
     },
     playlists: [
       { type: mongoose.Schema.Types.ObjectId, ref: 'Playlist' },

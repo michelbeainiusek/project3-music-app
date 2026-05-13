@@ -1,0 +1,13 @@
+git add .              # Stage all changes
+git commit -m "..."    # Save changes with a message
+git push origin main   # Send to GitHub
+
+
+git add views/artists/edit.ejs
+git commit -m "update: improve label text in artist edit form"
+git push origin main
+
+
+
+
+project3\views\playlists\edit.ejs

@@ -1,7 +1,8 @@
 // Factory function — returns a middleware that enforces a specific role.
 // Usage: requireRole('admin') on routes that only admins should access.
-const requireRole = (role) => (req, res, next) => {
-  if (!req.user || req.user.role !== role) {
+//check if user has right role if not cant do action
+const requireRole = (role) => (req, res, next) => { 
+  if (!req.user || req.user.role !== role) { 
     req.flash('error', 'You do not have permission to perform this action.');
     return res.redirect('/dashboard');
   }

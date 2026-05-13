@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/song.controller');
-const requireAuth = require('../middleware/auth');
-const requireRole = require('../middleware/role');
+const requireAuth = require('../middleware/auth');//requires authentication
+const requireRole = require('../middleware/role');//requires role
 
-router.get('/', requireAuth, ctrl.index);
+router.get('/', requireAuth, ctrl.index); // get all songs
 router.get('/new', requireAuth, requireRole('admin'), ctrl.renderCreate);
 router.post('/', requireAuth, requireRole('admin'), ctrl.create);
 // Relationship management routes must come before /:id to avoid matching conflicts

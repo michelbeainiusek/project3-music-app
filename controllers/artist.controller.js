@@ -4,16 +4,16 @@ const Playlist = require('../models/playlist.model');
 
 exports.index = async (req, res, next) => {
   try {
-    const artists = await Artist.find().sort({ name: 1 });
-    res.render('artists/index', { title: 'Artists', artists });
+    const artists = await Artist.find().sort({ name: 1 }); //fetch all artists and sort by name
+    res.render('artists/index', { title: 'Artists', artists }); //render index view with artists
   } catch (err) {
     next(err);
   }
 };
 
-exports.show = async (req, res, next) => {
+exports.show = async (req, res, next) => { // show single artist and their songs
   try {
-    const artist = await Artist.findById(req.params.id);
+    const artist = await Artist.findById(req.params.id); // find artist by id
     if (!artist) return res.status(404).render('error', { title: '404', message: 'Artist not found.' });
     const songs = await Song.find({ artist: artist._id }).sort({ title: 1 });
     res.render('artists/show', { title: artist.name, artist, songs });
@@ -22,15 +22,15 @@ exports.show = async (req, res, next) => {
   }
 };
 
-exports.renderCreate = (req, res) => {
+exports.renderCreate = (req, res) => { // render create artist form
   res.render('artists/create', { title: 'Add Artist' });
 };
 
-exports.create = async (req, res, next) => {
+exports.create = async (req, res, next) => {// process create artist form
   try {
-    const { name, country, bio } = req.body;
-    await Artist.create({ name, country, bio });
-    req.flash('success', 'Artist created successfully.');
+    const { name, country, bio } = req.body; // extract name, country and bio from body
+    await Artist.create({ name, country, bio }); // create new artist in mongodb
+    req.flash('success', 'Artist created successfully.'); // flash success message
     res.redirect('/artists');
   } catch (err) {
     req.flash('error', err.code === 11000 ? 'An artist with that name already exists.' : err.message);
@@ -38,29 +38,29 @@ exports.create = async (req, res, next) => {
   }
 };
 
-exports.renderEdit = async (req, res, next) => {
+exports.renderEdit = async (req, res, next) => { // render edit artist form
   try {
-    const artist = await Artist.findById(req.params.id);
-    if (!artist) return res.status(404).render('error', { title: '404', message: 'Artist not found.' });
+    const artist = await Artist.findById(req.params.id); // find artist by id     
+    if (!artist) return res.status(404).render('error', { title: '404', message: 'Artist not found.' }); // if artist not found return 404 error
     res.render('artists/edit', { title: 'Edit Artist', artist });
   } catch (err) {
     next(err);
   }
 };
 
-exports.update = async (req, res, next) => {
+exports.update = async (req, res, next) => { // process edit artist form
   try {
-    const { name, country, bio } = req.body;
-    await Artist.findByIdAndUpdate(req.params.id, { name, country, bio }, { runValidators: true });
-    req.flash('success', 'Artist updated successfully.');
-    res.redirect(`/artists/${req.params.id}`);
+    const { name, country, bio } = req.body; // extract name, country and bio from body
+    await Artist.findByIdAndUpdate(req.params.id, { name, country, bio }, { runValidators: true }); // update artist in mongodb
+    req.flash('success', 'Artist updated successfully.'); // flash success message
+    res.redirect(`/artists/${req.params.id}`); // redirect to artist details page
   } catch (err) {
-    req.flash('error', err.message);
+    req.flash('error', err.message); // flash error message
     res.redirect(`/artists/${req.params.id}/edit`);
   }
 };
 
-exports.destroy = async (req, res, next) => {
+exports.destroy = async (req, res, next) => { // delete an artist and all their songs
   try {
     // Collect song IDs before deleting so we can clean up playlist references
     const songs = await Song.find({ artist: req.params.id }, '_id');

@@ -4,12 +4,12 @@ const Playlist = require('../models/playlist.model');
 
 exports.index = async (req, res, next) => {
   try {
-    const [artistCount, songCount, playlistCount] = await Promise.all([
+    const [artistCount, songCount, playlistCount] = await Promise.all([ //run3 queries in parallel
       Artist.countDocuments(),
       Song.countDocuments(),
-      Playlist.countDocuments(),
+      Playlist.countDocuments(), // count each and wait since promise
     ]);
-    res.render('dashboard/index', {
+    res.render('dashboard/index', { // render dashboard view with counts 5fartist etc
       title: 'Dashboard',
       artistCount,
       songCount,
